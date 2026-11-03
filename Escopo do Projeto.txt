@@ -369,3 +369,20 @@ Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
      * 5ª: [24.0, 41.4]   (centro ~37)
   2. config.json & src/obd_manager.py: Parametrização centralizada em config.json com chave gear_ratio_ranges, permitindo calibração fina externa sem alteração no código Python.
   3. src/server.py: Configuração padrão atualizada com os novos limites nominais.
+
+
+[DESENVOLVIMENTO DO APLICATIVO NATIVO ANDROID - FIESTA COCKPIT USB APK (03/11/2026 - 16:45)]
+- Diagnóstico Conclusivo do Bloqueio WebUSB no Android:
+  * Validado via aplicativo 'Serial USB Terminal' (Prints/) que o cabo USB-C e o OTG do smartphone reconhecem perfeitamente a placa LC_CANABLE_V2.1 (Openlight Labs CANable2, VID 0x16D0, PID 0x117E).
+  * Após atualizar o filtro WebUSB para 0x16D0:0x117E, o Chrome listou e selecionou a placa, mas retornou 'Failed to execute claimInterface on USBDevice: Unable to claim interface', mesmo com a flag #automatic-usb-detach ativada, pois o kernel do Android bloqueia desanexação de interfaces CDC-ACM por processos em sandbox de navegador.
+- Solução Definitiva Implementada (Android_App_Fiesta/ + GitHub Actions CI):
+  * Criado projeto Android nativo completo em Java/Gradle ('com.fiesta.cockpit' - Fiesta Cockpit USB) utilizando a biblioteca 'usb-serial-for-android:3.8.0' (a mesma do Serial USB Terminal).
+  * MainActivity.java:
+    - ProbeTable customizado registrando explicitamente VID 0x16D0 / PID 0x117E (CANable V2.1), 0x1D50 / 0x606F (CANable V1) e 0x0483 / 0x5740 (STM32), com fallback direto para CdcAcmSerialDriver.
+    - Auto-conexão via intent-filter USB_DEVICE_ATTACHED (usb_device_filter.xml) e sequência automática SLCAN 500 kbps ('C', 'S6', 'O', 'V').
+    - Filtro inteligente de alta velocidade em thread nativa Java: respostas de diagnóstico (0x7E8) passam sem latência, enquanto frames de broadcast de alta frequência (0x422 Torque/AC e 0x430 Combustível) sofrem throttling para preservar 60 FPS na WebView.
+    - Exportação nativa de logs de viagem CSV de 25 colunas direto para a pasta Downloads do Android (MediaStore) com abertura automática do menu de compartilhamento (WhatsApp / Google Drive).
+  * Interface Integrada (assets/index.html & assets/app_mobile.js):
+    - Cockpit Digital completo com seletores de tema, mostradores Canvas (RPM e Velocidade), Marcha IB5 1.0 Flex calibrada, Consumo Speed-Density V2.0 (STFT/LTFT), Computador de Viagem, 9 Cards de sensores ([REAL] e [ESTIMADO]) e Modal de Terminal/Diagnóstico SLCAN embutido.
+  * Compilação Automatizada em Nuvem (.github/workflows/build_android_apk.yml):
+    - Pipeline GitHub Actions configurado para compilar o APK com JDK 17 + Android SDK + Gradle 8.5 e publicar automaticamente o instalador em 'apk/Fiesta_Cockpit_USB.apk', com botão de download direto no topo de Teste_WebUSB_CANable.html.

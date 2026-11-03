@@ -24,9 +24,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Setup Gradle 8.5
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -34,7 +31,7 @@ jobs:
 
       - name: Build Debug APK (usb-serial-for-android)
         working-directory: Android_App_Fiesta
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Publish APK to apk/ folder in repo
         run: |
@@ -42,6 +39,7 @@ jobs:
           cp Android_App_Fiesta/app/build/outputs/apk/debug/app-debug.apk apk/Fiesta_Cockpit_USB.apk
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main || true
           git add apk/Fiesta_Cockpit_USB.apk
           if ! git diff --cached --quiet; then
             git commit -m "chore(apk): publish compiled Fiesta_Cockpit_USB.apk [skip ci]"
