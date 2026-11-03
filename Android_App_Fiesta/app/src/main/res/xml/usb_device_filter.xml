@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CANable V2.1 Oficial (Openlight Labs / STM32G431): VID 0x16D0 (5840), PID 0x117E (4478) -->
+    <usb-device vendor-id="5840" product-id="4478" />
+    <usb-device vendor-id="5840" />
+
+    <!-- CANable V1 / Geschwister Schneider: VID 0x1D50 (7504), PID 0x606F (24687) -->
+    <usb-device vendor-id="7504" product-id="24687" />
+    <usb-device vendor-id="7504" />
+
+    <!-- STMicroelectronics Virtual COM Port: VID 0x0483 (1155), PID 0x5740 (22336) -->
+    <usb-device vendor-id="1155" product-id="22336" />
+    <usb-device vendor-id="1155" />
+</resources>

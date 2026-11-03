@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ford Fiesta Zetec Rocam - Cockpit Nativo USB</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <style>
+    html[data-theme="light"] body { background: #f1f5f9; color: #0f172a; }
+    html[data-theme="light"] .top-bar, html[data-theme="light"] .sensor-card, html[data-theme="light"] .gear-display-box, html[data-theme="light"] .consumption-hero-box, html[data-theme="light"] .trip-chip {
+      background: rgba(255,255,255,0.92); color: #0f172a; border-color: rgba(100,116,139,0.25);
+    }
+    html[data-theme="campbell"] body { background: #0c0c0c; color: #cccccc; }
+    html[data-theme="monokai"] body { background: #272822; color: #f8f8f2; }
+    html[data-theme="cyberpunk"] body { background: #05050a; color: #00f0ff; }
+    .theme-select-top {
+      background: rgba(15, 23, 42, 0.85);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .terminal-log-box {
+      background: #050811;
+      border: 1px solid rgba(0, 210, 255, 0.25);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 11.5px;
+      height: 220px;
+      overflow-y: auto;
+      color: #cbd5e1;
+      margin-bottom: 10px;
+    }
+    .term-row { margin-bottom: 3px; word-break: break-all; }
+    .term-tx { color: #38bdf8; }
+    .term-rx { color: #00e676; }
+    .term-err { color: #ff3366; }
+    .term-info { color: #ffb300; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar / Status do Sistema -->
+  <header class="top-bar">
+    <div class="brand-section">
+      <span class="brand-badge">FORD</span>
+      <span class="car-title">Fiesta 1.0 Rocam • USB Nativo</span>
+    </div>
+
+    <div id="live-clock" class="top-center-clock">--:--:--</div>
+
+    <div class="status-section" style="flex-wrap: wrap; gap: 6px;">
+      <div id="ac-badge" class="connection-badge" style="background: rgba(148,163,184,0.12); color: #94a3b8; border-color: rgba(148,163,184,0.25);">❄️ A/C OFF</div>
+      <div id="conn-info-badge" class="connection-badge" title="Toque para reconectar USB">USB OTG 500K</div>
+      <div id="mil-badge" class="mil-badge mil-ok">
+        <span id="mil-icon">✅</span>
+        <span id="mil-text">INJEÇÃO OK</span>
+      </div>
+      <button id="btn-open-terminal" class="btn-fullscreen" style="background: rgba(0,210,255,0.15); border-color: rgba(0,210,255,0.4); color: #00d2ff;">🔧 Terminal</button>
+      <select id="theme-switcher" class="theme-select-top" aria-label="Tema Visual">
+        <option value="dark">🌙 Dark</option>
+        <option value="light">☀️ Light</option>
+        <option value="campbell">💻 Campbell</option>
+        <option value="monokai">🎨 Monokai</option>
+        <option value="cyberpunk">⚡ Cyberpunk</option>
+      </select>
+      <button id="btn-fullscreen" class="btn-fullscreen">⛶ Cheia</button>
+      <div class="status-pill">
+        <div id="status-dot" class="status-dot"></div>
+        <span id="status-text">BUSCANDO USB...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container do Painel de Instrumentos -->
+  <main class="cluster-container">
+
+    <section class="main-cluster">
+      <!-- Tacômetro (RPM) -->
+      <div class="gauge-box">
+        <canvas id="gauge-rpm-canvas" class="gauge-canvas" width="360" height="360"></canvas>
+        <div class="gauge-center-text">
+          <div id="val-rpm" class="gauge-val">0</div>
+          <div class="gauge-unit">RPM <span class="tag-meta tag-real">REAL</span></div>
+        </div>
+      </div>
+
+      <!-- Centro: Marcha + Consumo + Trip -->
+      <div class="center-infocenter">
+        <div class="gear-display-box">
+          <div class="gear-header-wrap">
+            <span class="gear-label">MARCHA</span>
+            <span class="tag-meta tag-est">ESTIMADO</span>
+          </div>
+          <div id="val-gear" class="gear-number">N</div>
+          <span class="gear-subtext">CÂMBIO IB5 1.0</span>
+        </div>
+
+        <div class="consumption-hero-box">
+          <div class="hero-header-wrap">
+            <span class="hero-label">Consumo Instantâneo</span>
+            <span class="tag-meta tag-est">ESTIMADO</span>
+          </div>
+          <div class="hero-value-wrap">
+            <span id="val-consumption" class="hero-value">--</span>
+            <span id="unit-consumption" class="hero-unit">km/L</span>
+          </div>
+        </div>
+
+        <div class="trip-summary-bar">
+          <div class="trip-chip">
+            <div class="trip-chip-label">Distância Trip <span class="chip-meta tag-real">REAL</span></div>
+            <div id="val-trip-km" class="trip-chip-val">0.0 km</div>
+          </div>
+          <div class="trip-chip">
+            <div class="trip-chip-label">Tempo Viagem <span class="chip-meta tag-real">REAL</span></div>
+            <div id="val-trip-time" class="trip-chip-val">00:00:00</div>
+          </div>
+        </div>
+
+        <div class="trip-summary-sub">
+          <div class="trip-chip">
+            <div class="trip-chip-label">Gasto Viagem <span class="chip-meta tag-est">EST</span></div>
+            <div id="val-trip-fuel" class="trip-chip-val" style="color: #00e676;">0.00 L</div>
+          </div>
+          <div class="trip-chip">
+            <div class="trip-chip-label">Custo Est. <span class="chip-meta tag-est">EST</span></div>
+            <div id="val-trip-cost" class="trip-chip-val" style="color: #00d2ff;">R$ 0,00</div>
+          </div>
+          <div class="trip-chip">
+            <div class="trip-chip-label">Média Trip <span class="chip-meta tag-est">EST</span></div>
+            <div id="val-trip-avg" class="trip-chip-val">0.0 km/L</div>
+          </div>
+        </div>
+
+        <div class="trip-actions-bar">
+          <button id="btn-toggle-log" class="btn-trip btn-record">
+            <span id="log-dot" class="rec-dot"></span>
+            <span id="btn-log-text">GRAVAR LOG</span>
+          </button>
+          <button id="btn-reset-trip" class="btn-trip">🔄 ZERAR</button>
+          <button id="btn-open-logs" class="btn-trip">📂 LOGS</button>
+        </div>
+      </div>
+
+      <!-- Velocímetro (km/h) -->
+      <div class="gauge-box">
+        <canvas id="gauge-speed-canvas" class="gauge-canvas" width="360" height="360"></canvas>
+        <div class="gauge-center-text">
+          <div id="val-speed" class="gauge-val">0</div>
+          <div class="gauge-unit">KM/H <span class="tag-meta tag-real">REAL</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grade de 9 Sensores -->
+    <section class="sensors-grid">
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Temp. Motor</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">🌡️</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-coolant" class="card-num">--</span>
+          <span class="card-unit">°C</span>
+        </div>
+        <div class="progress-bg"><div id="progress-coolant" class="progress-fill"></div></div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Tensão Bateria</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-est">ESTIMADO</span>
+            <span class="card-icon">⚡</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-battery" class="card-num">--</span>
+          <span class="card-unit">V</span>
+        </div>
+        <div class="progress-bg"><div id="progress-battery" class="progress-fill"></div></div>
+        <div class="card-sub" style="color: #ffb300;">Aprox. por RPM • Sem ADC Físico</div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Pressão MAP</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">💨</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-map" class="card-num">--</span>
+          <span class="card-unit">kPa</span>
+        </div>
+        <div class="progress-bg"><div id="progress-map" class="progress-fill"></div></div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Borboleta (TPS)</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">🎯</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-throttle" class="card-num">--</span>
+          <span class="card-unit">%</span>
+        </div>
+        <div class="progress-bg"><div id="progress-throttle" class="progress-fill"></div></div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Combustível Real</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">⛽</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-fuel" class="card-num">--</span>
+          <span class="card-unit">%</span>
+        </div>
+        <div class="progress-bg"><div id="progress-fuel" class="progress-fill"></div></div>
+        <div id="val-fuel-sub" class="card-sub">-- L / 54L • Auton: -- km (Est.)</div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Carga do Motor</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">📈</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-load" class="card-num">--</span>
+          <span class="card-unit">%</span>
+        </div>
+        <div class="progress-bg"><div id="progress-load" class="progress-fill"></div></div>
+        <div class="card-sub">Esforço Volumétrico (ECU)</div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Ponto Ignição</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">⚡</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-timing" class="card-num">--</span>
+          <span class="card-unit">° APMS</span>
+        </div>
+        <div class="progress-bg"><div id="progress-timing" class="progress-fill"></div></div>
+        <div class="card-sub">Avanço da Centelha (ECU)</div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Sonda Lambda</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">🧬</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-trim-status" class="card-num" style="font-size: 20px;">--</span>
+          <span class="card-unit">A/F</span>
+        </div>
+        <div class="progress-bg"><div id="progress-trim" class="progress-fill"></div></div>
+        <div id="val-trim-sub" class="card-sub">STFT: --% • LTFT: --%</div>
+      </div>
+
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Torque Motor</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">⚙️</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-torque" class="card-num">0</span>
+          <span class="card-unit">Nm</span>
+        </div>
+        <div class="progress-bg"><div id="progress-torque" class="progress-fill" style="width: 0%;"></div></div>
+        <div id="val-torque-sub" class="card-sub">Máx Rocam: 93 Nm (73 cv)</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal Resumo da Viagem -->
+  <div id="modal-summary" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">🏁 Resumo da Viagem Concluída</span>
+        <button id="btn-close-summary" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="trip-stats-grid">
+        <div class="stat-item">
+          <div class="stat-label">Distância Percorrida</div>
+          <div id="summary-distance" class="stat-val">0.0 km</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Combustível Gasto</div>
+          <div id="summary-fuel" class="stat-val" style="color: #00e676;">0.00 L</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Custo Estimado</div>
+          <div id="summary-cost" class="stat-val" style="color: #00d2ff;">R$ 0,00</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Média da Viagem</div>
+          <div id="summary-avg-kml" class="stat-val">0.0 km/L</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Duração da Viagem</div>
+          <div id="summary-duration" class="stat-val">00:00:00</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Velocidade Média / Máx</div>
+          <div id="summary-speed" class="stat-val">0 / 0 km/h</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-download-current-log" class="btn-modal btn-modal-primary">📤 Salvar / Compartilhar CSV</button>
+        <button id="btn-dismiss-summary" class="btn-modal btn-modal-secondary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Lista de Logs -->
+  <div id="modal-logs-list" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">📂 Viagens Gravadas no Celular</span>
+        <button id="btn-close-logs-list" class="modal-close-btn">&times;</button>
+      </div>
+      <div id="logs-container" style="max-height: 280px; overflow-y: auto; margin-bottom: 16px;"></div>
+      <div class="modal-actions">
+        <button id="btn-dismiss-logs-list" class="btn-modal btn-modal-secondary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Terminal SLCAN & Diagnóstico -->
+  <div id="modal-terminal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 620px; width: 95%;">
+      <div class="modal-header">
+        <span class="modal-title">🔧 Terminal SLCAN & Diagnóstico USB (CANable V2.1)</span>
+        <button id="btn-close-terminal" class="modal-close-btn">&times;</button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+        <button id="btn-term-connect" class="btn-modal btn-modal-primary" style="padding: 6px 10px; font-size: 12px;">🔌 Reconectar USB</button>
+        <button id="btn-term-ver" class="btn-modal btn-modal-secondary" style="padding: 6px 10px; font-size: 12px;">Versão ('V')</button>
+        <button id="btn-term-init500" class="btn-modal btn-modal-secondary" style="padding: 6px 10px; font-size: 12px;">Abrir 500k (S6 + O)</button>
+        <button id="btn-term-dtc" class="btn-modal btn-modal-secondary" style="padding: 6px 10px; font-size: 12px;">Ler DTCs (Modo 03)</button>
+        <button id="btn-term-clear" class="btn-modal btn-modal-secondary" style="padding: 6px 10px; font-size: 12px;">Limpar</button>
+      </div>
+      <div id="terminal-log" class="terminal-log-box"></div>
+      <div style="display: flex; gap: 6px;">
+        <input id="term-custom-input" type="text" placeholder="Comando SLCAN (ex: t7E0802010C00000000)" style="flex: 1; background: #0f172a; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; padding: 8px 10px; font-family: monospace; font-size: 12px;">
+        <button id="btn-term-send" class="btn-modal btn-modal-primary" style="padding: 8px 14px;">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="gauge.js"></script>
+  <script src="app_mobile.js"></script>
+</body>
+</html>

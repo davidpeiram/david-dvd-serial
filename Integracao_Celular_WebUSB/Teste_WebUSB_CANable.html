@@ -301,13 +301,23 @@
     </div>
   </header>
 
+  <div class="status-card" style="border-color: var(--real); background: rgba(0, 230, 118, 0.08);">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <div>
+        <div style="font-weight: 800; color: var(--real); font-size: 0.92rem;">📲 App Android Nativo (Bypass Kernel CDC)</div>
+        <div style="color: var(--text-muted); font-size: 0.76rem; margin-top: 2px;">Cockpit Completo + Terminal SLCAN via <code>usb-serial-for-android</code> (VID 0x16D0:0x117E)</div>
+      </div>
+      <a href="https://github.com/davidpeiram/david-dvd-serial/raw/main/apk/Fiesta_Cockpit_USB.apk" download="Fiesta_Cockpit_USB.apk" style="background: var(--real); color: #050811; font-weight: 800; text-decoration: none; padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; white-space: nowrap;">📥 BAIXAR APK NATIVO</a>
+    </div>
+  </div>
+
   <div class="status-card">
     <div class="status-row">
       <span>Dispositivo USB:</span>
       <span id="usbStatusPill" class="status-pill">Desconectado</span>
     </div>
     <div class="status-row">
-      <span style="color: var(--text-muted); font-size: 0.78rem;">Alvo: LC_CANABLE_V2.1 (STM32G431) • VID: 0x1D50 / PID: 0x606F</span>
+      <span style="color: var(--text-muted); font-size: 0.78rem;">Alvo: LC_CANABLE_V2.1 (STM32G431) • VID: 0x16D0 / PID: 0x117E</span>
     </div>
   </div>
 

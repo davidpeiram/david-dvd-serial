@@ -22,3 +22,8 @@ logs/*
 *.swo
 Thumbs.db
 Desktop.ini
+
+# Build temporário Android
+Android_App_Fiesta/.gradle/
+Android_App_Fiesta/build/
+Android_App_Fiesta/app/build/
