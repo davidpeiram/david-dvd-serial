@@ -1,13 +1,17 @@
 package com.fiesta.cockpit;
 
+import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbEndpoint;
+import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
 import android.os.Build;
@@ -25,38 +29,27 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
-import com.hoho.android.usbserial.driver.CdcAcmSerialDriver;
-import com.hoho.android.usbserial.driver.ProbeTable;
-import com.hoho.android.usbserial.driver.UsbSerialDriver;
-import com.hoho.android.usbserial.driver.UsbSerialPort;
-import com.hoho.android.usbserial.driver.UsbSerialProber;
-
-import org.json.JSONObject;
-
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     private static final String ACTION_USB_PERMISSION = "com.fiesta.cockpit.USB_PERMISSION";
 
     private WebView webView;
     private UsbManager usbManager;
-    private UsbSerialPort usbSerialPort;
     private UsbDeviceConnection usbConnection;
+    private UsbEndpoint epIn;
+    private UsbEndpoint epOut;
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
     private final AtomicBoolean snifferMode = new AtomicBoolean(false);
     private Thread readThread;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    // Throttling por ID CAN para evitar sobrecarga de 500 frames/s na WebView
     private final Map<String, Long> lastBroadcastSentMs = new ConcurrentHashMap<>();
 
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
@@ -68,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
                 if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false) && device != null) {
                     openDevice(device);
                 } else {
-                    notifyJsStatus("PERMISSION_DENIED", "Permissão USB negada pelo usuário.");
+                    notifyJsStatus("PERMISSION_DENIED", "Permissao USB negada pelo usuario.");
                 }
             } else if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
                 scanAndConnectUsb();
@@ -83,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Mantém a tela sempre acesa durante a condução no Fiesta
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
@@ -103,7 +95,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // Tenta conectar automaticamente 600ms após carregar a interface
                 mainHandler.postDelayed(() -> scanAndConnectUsb(), 600);
             }
         });
@@ -116,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
             registerReceiver(usbReceiver, filter);
@@ -140,17 +131,6 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    private UsbSerialProber getCustomProber() {
-        ProbeTable customTable = new ProbeTable();
-        // CANable V2.1 Oficial (Openlight Labs STM32G431): VID 0x16D0, PID 0x117E
-        customTable.addProduct(0x16D0, 0x117E, CdcAcmSerialDriver.class);
-        // CANable V1 (OpenMoko): VID 0x1D50, PID 0x606F
-        customTable.addProduct(0x1D50, 0x606F, CdcAcmSerialDriver.class);
-        // STMicroelectronics Virtual COM Port
-        customTable.addProduct(0x0483, 0x5740, CdcAcmSerialDriver.class);
-        return new UsbSerialProber(customTable);
-    }
-
     private synchronized void scanAndConnectUsb() {
         if (isConnected.get()) {
             notifyJsStatus("CONNECTED", "CANable V2.1 Ativa (500 kbps)");
@@ -158,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (usbManager == null) {
-            notifyJsStatus("ERROR", "UsbManager indisponível no Android");
+            notifyJsStatus("ERROR", "UsbManager indisponivel no Android");
             return;
         }
 
@@ -168,33 +148,29 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Procura primeiro com o prober padrão + customizado (16D0:117E)
-        List<UsbSerialDriver> drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager);
-        if (drivers.isEmpty()) {
-            drivers = getCustomProber().findAllDrivers(usbManager);
-        }
-
         UsbDevice targetDevice = null;
-        if (!drivers.isEmpty()) {
-            targetDevice = drivers.get(0).getDevice();
-        } else {
-            // Fallback universal: usa o primeiro dispositivo USB conectado como CDC-ACM
+        for (UsbDevice dev : deviceList.values()) {
+            int vid = dev.getVendorId();
+            if (vid == 0x16D0 || vid == 0x1D50 || vid == 0x0483) {
+                targetDevice = dev;
+                break;
+            }
+        }
+        if (targetDevice == null) {
             targetDevice = deviceList.values().iterator().next();
         }
 
-        if (targetDevice != null) {
-            if (usbManager.hasPermission(targetDevice)) {
-                openDevice(targetDevice);
-            } else {
-                notifyJsStatus("REQUESTING_PERMISSION", "Solicitando permissão USB ao Android...");
-                Intent permIntent = new Intent(ACTION_USB_PERMISSION);
-                permIntent.setPackage(getPackageName());
-                int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                        ? PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
-                        : PendingIntent.FLAG_UPDATE_CURRENT;
-                PendingIntent pi = PendingIntent.getBroadcast(this, 0, permIntent, flags);
-                usbManager.requestPermission(targetDevice, pi);
-            }
+        if (usbManager.hasPermission(targetDevice)) {
+            openDevice(targetDevice);
+        } else {
+            notifyJsStatus("REQUESTING_PERMISSION", "Solicitando permissao USB ao Android...");
+            Intent permIntent = new Intent(ACTION_USB_PERMISSION);
+            permIntent.setPackage(getPackageName());
+            int flags = Build.VERSION.SDK_INT >= 31
+                    ? PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
+                    : PendingIntent.FLAG_UPDATE_CURRENT;
+            PendingIntent pi = PendingIntent.getBroadcast(this, 0, permIntent, flags);
+            usbManager.requestPermission(targetDevice, pi);
         }
     }
 
@@ -202,41 +178,68 @@ public class MainActivity extends AppCompatActivity {
         closeSerial();
 
         try {
-            UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(device);
-            if (driver == null) {
-                driver = getCustomProber().probeDevice(device);
-            }
-            if (driver == null) {
-                driver = new CdcAcmSerialDriver(device);
-            }
-
-            if (driver.getPorts().isEmpty()) {
-                notifyJsStatus("ERROR", "Nenhuma porta CDC encontrada no dispositivo");
-                return;
-            }
-
             UsbDeviceConnection conn = usbManager.openDevice(device);
             if (conn == null) {
-                notifyJsStatus("ERROR", "Falha ao abrir conexão USB nativa");
+                notifyJsStatus("ERROR", "Falha ao abrir conexao USB nativa");
                 return;
             }
 
-            UsbSerialPort port = driver.getPorts().get(0);
-            port.open(conn);
-            port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
-            try {
-                port.setDTR(true);
-                port.setRTS(true);
-            } catch (Exception ignored) {}
+            UsbEndpoint foundIn = null;
+            UsbEndpoint foundOut = null;
+            int controlInterfaceId = 0;
+
+            // Desanexa o driver CDC do kernel do Android usando force=true nativo!
+            for (int i = 0; i < device.getInterfaceCount(); i++) {
+                UsbInterface intf = device.getInterface(i);
+                conn.claimInterface(intf, true);
+
+                if (intf.getInterfaceClass() == UsbConstants.USB_CLASS_COMM) {
+                    controlInterfaceId = intf.getId();
+                }
+
+                for (int j = 0; j < intf.getEndpointCount(); j++) {
+                    UsbEndpoint ep = intf.getEndpoint(j);
+                    if (ep.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                        if (ep.getDirection() == UsbConstants.USB_DIR_IN) {
+                            foundIn = ep;
+                        } else if (ep.getDirection() == UsbConstants.USB_DIR_OUT) {
+                            foundOut = ep;
+                        }
+                    }
+                }
+            }
+
+            if (foundIn == null || foundOut == null) {
+                conn.close();
+                notifyJsStatus("ERROR", "Endpoints Bulk IN/OUT nao encontrados no dispositivo");
+                return;
+            }
+
+            // Configura CDC-ACM: SET_LINE_CODING (0x20) -> 115200 bps, 1 stop bit, sem paridade, 8 bits
+            int baud = 115200;
+            byte[] lineCoding = new byte[] {
+                    (byte) (baud & 0xFF),
+                    (byte) ((baud >> 8) & 0xFF),
+                    (byte) ((baud >> 16) & 0xFF),
+                    (byte) ((baud >> 24) & 0xFF),
+                    0, // 1 stop bit
+                    0, // sem paridade
+                    8  // 8 data bits
+            };
+            conn.controlTransfer(0x21, 0x20, 0, controlInterfaceId, lineCoding, lineCoding.length, 500);
+
+            // SET_CONTROL_LINE_STATE (0x22) -> DTR=1, RTS=1 (0x03)
+            conn.controlTransfer(0x21, 0x22, 0x03, controlInterfaceId, null, 0, 500);
 
             this.usbConnection = conn;
-            this.usbSerialPort = port;
+            this.epIn = foundIn;
+            this.epOut = foundOut;
             this.isConnected.set(true);
 
             String devInfo = String.format("CANable %04X:%04X (500k)", device.getVendorId(), device.getProductId());
             notifyJsStatus("CONNECTED", devInfo);
 
-            // Inicializa automaticamente o protocolo SLCAN em 500 kbps (Ford HS-CAN)
+            // Inicializa automaticamente o barramento SLCAN em 500 kbps (Ford HS-CAN)
             new Thread(() -> {
                 try {
                     writeRaw("C\r");
@@ -259,12 +262,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void startReadLoop() {
         readThread = new Thread(() -> {
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[512];
             StringBuilder lineBuf = new StringBuilder(128);
 
-            while (isConnected.get() && usbSerialPort != null) {
+            while (isConnected.get() && usbConnection != null && epIn != null) {
                 try {
-                    int len = usbSerialPort.read(buffer, 40);
+                    int len = usbConnection.bulkTransfer(epIn, buffer, buffer.length, 40);
                     if (len > 0) {
                         for (int i = 0; i < len; i++) {
                             char c = (char) (buffer[i] & 0xFF);
@@ -286,7 +289,7 @@ public class MainActivity extends AppCompatActivity {
                 } catch (Exception e) {
                     if (isConnected.get()) {
                         closeSerial();
-                        notifyJsStatus("DISCONNECTED", "Conexão serial perdida");
+                        notifyJsStatus("DISCONNECTED", "Conexao serial perdida");
                     }
                     break;
                 }
@@ -299,12 +302,11 @@ public class MainActivity extends AppCompatActivity {
     private void handleIncomingSlcanLine(String line) {
         if (line.isEmpty()) return;
 
-        // Quadros CAN standard 11-bit: tIIILDD...
         if (line.startsWith("t") && line.length() >= 5) {
             String idHex = line.substring(1, 4).toUpperCase();
             long now = System.currentTimeMillis();
 
-            // Respostas de diagnóstico OBD-II / UDS (0x7E8, 0x728, 0x72E) passam com prioridade imediata!
+            // Respostas de diagnóstico OBD-II / UDS (0x7E8, 0x728, 0x72E) passam sem latência!
             if (idHex.startsWith("7")) {
                 dispatchFrameToJs(line);
                 return;
@@ -320,7 +322,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            // Frame 0x430 (Boia Real do Tanque + Botão A/C): throttle de 200ms (5 Hz)
+            // Frame 0x430 (Boia Real do Tanque): throttle de 200ms (5 Hz)
             if ("430".equals(idHex)) {
                 Long last = lastBroadcastSentMs.get("430");
                 if (last == null || (now - last) >= 200) {
@@ -330,7 +332,6 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            // Se o usuário estiver na aba Sniffer / Monitor Bruto, encaminha os demais IDs com throttle de 120ms
             if (snifferMode.get()) {
                 Long last = lastBroadcastSentMs.get(idHex);
                 if (last == null || (now - last) >= 120) {
@@ -339,7 +340,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         } else {
-            // Respostas de comando (ex: 'V' versão do firmware)
             dispatchFrameToJs(line);
         }
     }
@@ -366,10 +366,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private synchronized boolean writeRaw(String data) {
-        if (!isConnected.get() || usbSerialPort == null) return false;
+        if (!isConnected.get() || usbConnection == null || epOut == null) return false;
         try {
-            usbSerialPort.write(data.getBytes(StandardCharsets.US_ASCII), 150);
-            return true;
+            byte[] bytes = data.getBytes(StandardCharsets.US_ASCII);
+            int res = usbConnection.bulkTransfer(epOut, bytes, bytes.length, 150);
+            return res >= 0;
         } catch (Exception e) {
             return false;
         }
@@ -377,14 +378,11 @@ public class MainActivity extends AppCompatActivity {
 
     private synchronized void closeSerial() {
         isConnected.set(false);
-        if (usbSerialPort != null) {
+        if (usbConnection != null && epOut != null) {
             try {
-                usbSerialPort.write("C\r".getBytes(StandardCharsets.US_ASCII), 50);
+                byte[] closeCmd = "C\r".getBytes(StandardCharsets.US_ASCII);
+                usbConnection.bulkTransfer(epOut, closeCmd, closeCmd.length, 50);
             } catch (Exception ignored) {}
-            try {
-                usbSerialPort.close();
-            } catch (Exception ignored) {}
-            usbSerialPort = null;
         }
         if (usbConnection != null) {
             try {
@@ -392,6 +390,8 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
             usbConnection = null;
         }
+        epIn = null;
+        epOut = null;
     }
 
     public class AndroidUsbBridge {
@@ -449,8 +449,7 @@ public class MainActivity extends AppCompatActivity {
                 String cleanName = (filename != null && !filename.isEmpty()) ? filename : "viagem_fiesta.csv";
                 if (!cleanName.endsWith(".csv")) cleanName += ".csv";
 
-                // Salva na pasta pública Downloads do Android (Android 10+ MediaStore)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (Build.VERSION.SDK_INT >= 29) {
                     ContentValues values = new ContentValues();
                     values.put(MediaStore.Downloads.DISPLAY_NAME, cleanName);
                     values.put(MediaStore.Downloads.MIME_TYPE, "text/csv");
@@ -463,13 +462,13 @@ public class MainActivity extends AppCompatActivity {
                                 os.write(csvContent.getBytes(StandardCharsets.UTF_8));
                             }
                         }
+                        final String savedName = cleanName;
                         mainHandler.post(() -> Toast.makeText(
                                 MainActivity.this,
-                                "Salvo em Downloads: " + cleanName,
+                                "Salvo em Downloads: " + savedName,
                                 Toast.LENGTH_LONG
                         ).show());
 
-                        // Abre menu de compartilhamento do Android (WhatsApp / Drive)
                         Intent shareIntent = new Intent(Intent.ACTION_SEND);
                         shareIntent.setType("text/csv");
                         shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
@@ -480,7 +479,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
-                // Fallback de compartilhamento de texto direto
                 Intent sendIntent = new Intent(Intent.ACTION_SEND);
                 sendIntent.setType("text/plain");
                 sendIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName);

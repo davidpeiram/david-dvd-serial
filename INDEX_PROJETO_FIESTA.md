@@ -100,7 +100,13 @@ Projetos/Projeto Fiesta Zetec Rocam 1.0/
 │   │   ├── parte-2-Consideracoes_Parte2_Dados_ECU_Fiesta.txt
 │   │   └── Considerações 2/        # Reviews detalhadas de Claude e GPT sobre o sniffer e CAN
 │   │
-│   └── Integracao_Celular_WebUSB/  # Módulo de conexão direta CANable no celular Android via WebUSB
-│       ├── Instrucoes_Integracao_Celular_WebUSB.md
-│       └── Teste_WebUSB_CANable.html
+│   ├── Integracao_Celular_WebUSB/  # Módulo de conexão direta CANable no celular Android via WebUSB
+│   │   ├── Instrucoes_Integracao_Celular_WebUSB.md
+│   │   └── Teste_WebUSB_CANable.html
+│   │
+│   ├── Android_App_Fiesta/         # Projeto Android Nativo (APK com usb-serial-for-android + Cockpit WebView)
+│   │   └── app/src/main/           # MainActivity.java (CDC 16D0:117E) + assets (Cockpit & Terminal)
+│   │
+│   └── apk/                        # Instalador compilado pronto para o celular
+│       └── Fiesta_Cockpit_USB.apk  # APK nativo gerado automaticamente via GitHub Actions
 ```
