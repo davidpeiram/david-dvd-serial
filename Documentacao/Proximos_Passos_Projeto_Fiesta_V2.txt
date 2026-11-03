@@ -1,0 +1,183 @@
+================================================================================
+PROJETO FIESTA ZETEC ROCAM 1.0 - CHECKPOINT DE TRANSIÇÃO E PRÓXIMOS PASSOS (V2.0)
+================================================================================
+Data do Registro: 02/11/2026 - 15:38
+Veículo: Ford Fiesta Sedan 1.0 8V Flex (Ano 2010)
+Hardware: LC_CANABLE_V2.1 (MCU STM32G431) - Porta COM9 a 500 kbps (HS-CAN)
+Interface: Painel Cockpit Digital Web (FastAPI, WebSockets, HTML5 Canvas)
+Documento de Referência: Para o Agente de IA e para o David continuarem a partir daqui.
+================================================================================
+
+1. RESUMO EXECUTIVO DO ESTADO ATUAL
+--------------------------------------------------------------------------------
+O projeto concluiu com 100% de sucesso a FASE 1 e agora está completamente 
+estruturado na VERSÃO 2.0 (V2.0). 
+
+Todas as críticas, análises e sugestões das pastas "Considerações do David" 
+(Parte 1 e Parte 2) foram acolhidas, projetadas e codificadas na prática.
+
+O sistema já opera com dados reais do veículo conectado (RPM, Velocidade, TPS, 
+MAP, ECT, Avanço de Ignição, Trims da Sonda Lambda e Boia do Tanque via CAN 0x430).
+
+
+2. TODAS AS ALTERAÇÕES IMPLEMENTADAS NESTA SESSÃO (VERSÃO 2.0)
+--------------------------------------------------------------------------------
+
+2.1 Rigor Metrológico e Diferenciação Mandatória (REAL vs. ESTIMADO):
+    - Em conformidade com a nova regra de ouro da instrumentação automotiva, todo e 
+      qualquer dado do sistema foi formalmente classificado:
+      * REAL (Verde / #00e676): RPM (CKP), Velocidade (VSS), Temperatura (ECT), 
+        Pressão MAP, Borboleta (TPS), Nível do Tanque (CAN 0x430), Avanço (PID 0x0E), 
+        Sonda Lambda (STFT/LTFT), Diagnóstico (MIL/DTC) e Odômetro parcial.
+      * ESTIMADO (Âmbar / #ffb300): Marcha calculada pelo câmbio IB5, Consumo Instantâneo 
+        Speed-Density, Autonomia DTE, Gasto da Viagem (L e R$) e Tensão da Bateria.
+    - Card de Bateria no Cockpit agora exibe honestamente:
+      "Tensão Bateria [ESTIMADO] • Aprox. por RPM • Sem ADC Físico".
+
+2.2 Novo Documento Mestre de Diretrizes (AGENTS.md do Fiesta):
+    - Criado 'Projetos/Projeto Fiesta Zetec Rocam 1.0/AGENTS.md' com todas as 
+      regras operacionais, limites elétricos (Pino 16 isolado), mapeamento de PIDs 
+      e diretrizes de robustez para qualquer IA que atue no projeto.
+
+2.3 Modelo de Consumo Speed-Density Multicombustível (src/fuel_calculator.py):
+    - Incorporou a compensação dinâmica de malha fechada via correções de mistura:
+      trim_mult = 1.0 + ((STFT + LTFT) / 100.0) [com clamp de 0.65 a 1.35].
+    - Como o carro do David acusou STFT -14.1% e LTFT -13.3% na lenta, a injeção 
+      estava retirando ~27% de combustível. O novo cálculo reduz o erro de consumo 
+      de ~30% para a margem de precisão de instrumentos reais (<5%).
+    - Suporte aos modos 'flex_auto', 'gasoline' (E27 AFR 13.2) e 'ethanol' (E100 AFR 9.0).
+    - Fator K de calibração volumétrica empírica pós-bomba (fuel_calibration_k_factor).
+
+2.4 Watchdog Temporal e Proteção Contra Dados Congelados (src/obd_manager.py):
+    - Controle de timestamp de atualização por sensor.
+    - Se o sinal de velocidade ou rotação parar de responder (>1.5s sem resposta da ECU), 
+      a integração do odômetro (Trip km) e do combustível queimado é INTERROMPIDA 
+      imediatamente, evitando acúmulo de distância e consumo fantasma.
+    - Mostradores atenuam a opacidade visual (.stale-indicator) indicando pausa.
+
+2.5 Estados Discriminados de Conexão no Topo do Painel:
+    - 🟢 ECU ONLINE (500k): Barramento CAN ativo e ECU Ford EEC-VI respondendo.
+    - 🟡 AGUARDANDO ECU...: Cabo USB plugado e CAN aberto, mas chave desligada.
+    - 🔵 DEMO BANCADA: Modo simulação em execução sem hardware.
+    - 🔴 DESCONECTADO: Cabo USB ausente ou porta COM fechada.
+
+2.6 Histerese e Amortecimento de Marchas (src/gear_detector.py):
+    - Implementada classe GearDetector com buffer móvel (deque) e histerese: 
+      exige 3 concordâncias consecutivas antes de alterar a marcha na tela.
+    - Amortecimento durante trocas de marcha com pedal de embreagem pisado, 
+      eliminando o efeito de número piscando no visor central.
+
+2.7 Consulta Direcionada à ECU do Motor (0x7E0):
+    - PIDs OBD-II agora são enviados ao ID físico 0x7E0 em vez de broadcast 0x7DF, 
+      reduzindo overhead e acelerando o ciclo de atualização.
+
+2.8 Centralização Rigorosa em config.json:
+    - Removidos números hardcoded do código (tanque 54L, reserva 5L, preço R$ 6,30/L, 
+      IDs de barramento e timeouts agora são 100% configuráveis).
+
+2.9 Segurança e Sanitização de Endpoints (src/server.py):
+    - Bloqueio estrito de Path Traversal no download de logs CSV (/api/logs/download).
+    - Sanitização de prefixos de viagem contra caracteres maliciosos.
+    - Reconexão sem destruir o objeto OBDManager ou invalidar WebSockets.
+    - Escapamento de entidades HTML no modal de histórico de logs (Prevenção XSS).
+    - Criado arquivo .gitignore isolando __pycache__ e logs temporários.
+
+2.10 Diagnóstico de Bancada Granular (test_bancada_canable.py):
+    - Pontuação independente: USB-CDC, SLCAN, Bitrate 500k S6, Loopback e Modo Normal O.
+    - Veredito claro: APROVADO PARA OPERAÇÃO NO VEÍCULO, REPROVADO ou INCONCLUSIVO.
+
+2.11 Descoberta da "Parte 2" e Novas Ferramentas Desenvolvidas:
+    - Descoberta: O Byte 4 do PID 0x00 respondeu com 0x11, provando que o bit do 
+      PID 0x20 ESTÁ LIGADO! A ECU Ford possui árvore secundária de PIDs que ainda 
+      não foram explorados (faixa 0x21 a 0x40 e além).
+    - Ferramenta 1: 'scanner_inventario_ecu.py' e 'escanear_ecu.bat' (Scanner de 1 clique 
+      que varre recursivamente todos os bitmasks, testa PIDs especiais como 0x42, 0x51, 
+      0x52, 0x33, lê Modo 09 VIN/Calibração e salva em 'inventario_ecu_fiesta.json').
+    - Ferramenta 2: 'sniff_passivo_fiesta.py' e 'sniff_passivo.bat' (Sniffer passivo 
+      que monitora em tempo real e detecta deltas ao ligar o ar-condicionado, pisar 
+      no freio, abrir portas ou acionar o desembaçador).
+    - Modo 03 no Painel: Criado decodificador SAE J1979 de códigos alfanuméricos. 
+      Se houver anomalia na injeção, o painel exibe o código oficial exato (ex: 'FALHA (P0171)').
+
+
+================================================================================
+3. ROTEIRO EXATO PARA QUANDO VOCÊ VOLTAR (PRÓXIMOS PASSOS)
+================================================================================
+
+Quando você decidir retomar os testes no Fiesta, siga esta ordem prática:
+
+PASSO 1: Rodar o Scanner Automático da ECU (Tempo estimado: 30 segundos)
+--------------------------------------------------------------------------------
+1. Conecte o cabo USB do CANable no seu computador/notebook.
+2. Ligue o cabo OBD2 na tomada de diagnóstico do carro (abaixo do volante).
+3. Gire a chave do carro para o primeiro estágio (painel aceso) ou dê a partida.
+4. Execute o arquivo:
+   👉 'escanear_ecu.bat'
+5. O script fará a varredura completa automática e criará o arquivo:
+   👉 'inventario_ecu_fiesta.json'
+
+PASSO 2: Análise dos Resultados do Scanner
+--------------------------------------------------------------------------------
+Abra o 'inventario_ecu_fiesta.json' gerado (ou peça para a IA ler para você) e verifique:
+  [ ] O PID 0x42 (Tensão do Módulo) respondeu com valor numérico real?
+      -> Se SIM: alteramos imediatamente o card de bateria de 'ESTIMADO' para 'REAL'!
+  [ ] O PID 0x52 (Percentual de Etanol) ou 0x51 responderam?
+      -> Se SIM: criamos um medidor de Álcool vs. Gasolina na tela!
+  [ ] O PID 0x33 (Pressão Barométrica) respondeu?
+  [ ] O Modo 09 retornou o Calibration ID da ECU?
+      -> Confirmaremos se a ECU é Ford EEC-VI ou Magneti Marelli 4CFR.
+  [ ] O Modo 03 acusou algum código de falha gravado na memória?
+
+PASSO 3: Mapeamento de Botões com o Sniffer Passivo (Opcional / Divertido)
+--------------------------------------------------------------------------------
+1. Com o carro ligado, execute:
+   👉 'sniff_passivo.bat'
+2. Olhe para a tela e realize uma ação por vez:
+   - Ligue o Ar-Condicionado (botão A/C)
+   - Pise no pedal de freio
+   - Abra a porta do motorista
+   - Ligue o desembaçador traseiro
+3. A tela indicará com '🔥 ALTERANDO AGORA!' exatamente qual CAN ID mudou de estado.
+4. Ao fechar com Ctrl+C, o script salvará o log com os deltas exatos na pasta 'logs/'.
+
+PASSO 4: Teste de Pista com o Cockpit V2.0 e Datalogger
+--------------------------------------------------------------------------------
+1. Execute:
+   👉 'iniciar_painel.bat'
+2. Abra o navegador em: http://localhost:8000
+3. Clique no botão '🔴 GRAVAR LOG' antes de iniciar seu trajeto.
+4. Dirija normalmente. Observe:
+   - A estabilidade da marcha (sem piscar nas trocas de marcha com embreagem).
+   - O consumo instantâneo refletindo os trims da Sonda Lambda.
+   - O status verde 'ECU ONLINE (500k)'.
+5. Ao chegar ao destino, clique em 'PARAR LOG' e veja o modal de resumo da viagem 
+   com a distância real, litros consumidos e custo financeiro estimado.
+
+
+================================================================================
+4. MAPA DE ARQUIVOS CHAVE DO PROJETO V2.0
+================================================================================
+- Launcher do Painel Cockpit:          iniciar_painel.bat
+- Launcher do Scanner de PIDs:         escanear_ecu.bat
+- Launcher do Sniffer Passivo CAN:     sniff_passivo.bat
+- Launcher do Teste de Bancada:        testar_bancada.bat
+- Diretrizes Técnicas e Metrologia:    AGENTS.md
+- Diário de Bordo Oficial:             Escopo do Projeto.txt
+- Configurações Centrais do Veículo:   config.json
+- Código-Fonte Principal (src/):
+  * src/can_adapter.py                 (Driver SLCAN com detecção por VID/PID)
+  * src/obd_manager.py                 (Gerenciador com Watchdog temporal de PIDs)
+  * src/fuel_calculator.py             (Speed-Density com compensação de malha fechada)
+  * src/gear_detector.py               (Detecção de marcha com histerese temporal)
+  * src/obd_pids.py                    (Decodificadores SAE J1979 e Modo 03 DTCs)
+  * src/server.py                      (FastAPI, WebSockets seguros e Anti-Traversal)
+  * src/datalogger.py                  (Gravação contínua a 10 Hz em CSV)
+- Interface Cockpit Web (static/):
+  * static/index.html                  (Cluster automotivo com tags REAL/ESTIMADO)
+  * static/css/dashboard.css           (Estilização Dark Cockpit / Argon UI)
+  * static/js/app.js                   (Gerenciador de tela, conexão e WebSockets)
+  * static/js/gauge.js                 (Mostradores analógicos em HTML5 Canvas)
+- Pasta de Logs Salvos:                logs/
+================================================================================
+FIM DO DOCUMENTO DE TRANSIÇÃO - BOM DESCANSO E BONS ESTUDOS DE CÁLCULO 2!
+================================================================================

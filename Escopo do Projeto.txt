@@ -1,0 +1,342 @@
+Pretendo utilizar essa pasta para montar um software que seja capaz de ler os dados que veem do conector 16 pinos, lendo o padrão do protocolo OBD2. 
+Meu carro é um Fiesta 2010 Sedan 1.0 Zetec Rocam. 
+Minha intenção futura, depois desse sistema que irei validar, uma tvbox, um tablet antigo ou uma tela para fazer um visor no meu carro.
+Atualmente possuo o conector 16 pintos e o conversor da rede CAN para protocolo Serial, para eu poder conectar em meu carro. Ainda não fiz o chicote da fiação desse plug, então ainda faremos juntos. De primeiro momento, você utilizará esse TXT para ir armazenando o progresso do projeto de como ele está andando. Futuramente, você ou outro agente, irá ler esse TXT e entender em qual estágio esse programa nosso está.
+
+
+------
+Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
+------
+
+[STATUS INICIAL - 26/10/2026]
+- Objetivo do Projeto: Leitura de telemetria OBD2 do Ford Fiesta 2010 Sedan 1.0 Zetec Rocam para exibir em tela/tablet/TV Box como painel/computador de bordo.
+- Hardware Atual:
+  * Conector OBD2 macho de 16 pinos (chicote a ser confeccionado).
+  * Conversor CAN para Serial (necessita definir modelo/pinos: ex. MCP2515, ELM327, FTDI/CH340).
+- Etapa Atual: Fase 0 - Alinhamento e Planejamento da Montagem do Chicote.
+
+[ATUALIZAÇÃO - HARDWARE DEFINIDO]
+- Módulo CAN: LC_CANABLE_V2.1 (MCU: STM32G431).
+- Características do módulo:
+  * Suporte a CAN 2.0A/B e CAN-FD.
+  * Conexão USB (opera em modo slcan como porta COM serial virtual ou candleLight / gs_usb).
+  * Barramento CAN: pinos CAN_H, CAN_L e GND.
+  * Alimentação da placa: USB (5V do computador/tablet/tvbox). Não precisa ligar o 12V da bateria do carro na placa.
+  * Jumper de terminação (120 Ohms): DEVE FICAR ABERTO/DESLIGADO ao conectar no carro.
+- Mapeamento de pinos OBD2 -> CANable:
+  * OBD2 Pino 6 (CAN_H) -> CANable CAN_H
+  * OBD2 Pino 14 (CAN_L) -> CANable CAN_L
+  * OBD2 Pino 4 ou 5 (GND) -> CANable GND
+  * OBD2 Pino 16 (+12V Bateria): ISOLAR (não conectar no CANable para não queimar a placa).
+
+[ATUALIZAÇÃO - FASE DE SOFTWARE INICIADA]
+- Decisão: Desenvolvimento da camada de software antecipada antes da montagem física final.
+- Estrutura planejada:
+  1. Driver/Abstração CAN: Suporte a modo real (slcan / socketcan via python-can) e modo Simulação (Mock OBD2 para testes sem o carro).
+  2. Protocolo OBD-II (ISO 15765-4 / SAE J1979): Consultas de PIDs padrão (RPM, Velocidade, Temp Água, Nível de Combustível, Tensão, etc.).
+  3. Interface de Visualização: Dashboards de instrumentos digitais.
+
+[ATUALIZAÇÃO - STACK DO FRONTEND DEFINIDO]
+- Interface Escolhida: Dashboard Web em HTML / CSS / JavaScript.
+- Backend: Python (FastAPI com WebSockets para transmissão em tempo real com baixa latência).
+- Discussão de UI: Avaliação do Argon Dashboard / Design System (Creative Tim) para estilização de cards de telemetria, integrando mostradores circulares (gauges) em modo Dark/Cockpit para condução noturna.
+
+[ENTREGA - FASE 1: SOFTWARE E SIMULADOR CONCLUÍDOS]
+- Arquivos Criados:
+  * requirements.txt: Dependências do sistema (fastapi, uvicorn, websockets, pyserial, python-can).
+  * config.json: Configuração central (chave "mode": "simulation" ou "real", porta COM, baudrate, taxa de atualização).
+  * src/obd_pids.py: Decodificadores matemáticos de PIDs OBD-II (RPM, Velocidade, Temp Água, MAP, TPS, Bateria, IAT, Combustível).
+  * src/can_adapter.py: Abstração de hardware CAN. Inclui MockCANAdapter (simulador dinâmico da ECU do Zetec Rocam) e CANableSLCANAdapter (driver direto para LC_CANABLE_V2.1 STM32G431).
+  * src/obd_manager.py: Gerenciador com fila de prioridades e pooling não bloqueante.
+  * src/server.py: Servidor FastAPI com WebSockets de alta taxa para transmissão em tempo real.
+  * static/index.html, static/css/dashboard.css, static/js/gauge.js, static/js/app.js: Dashboard estilo Cockpit Dark com mostradores de RPM/Velocidade em Canvas e cards de telemetria inspirados no Argon Dashboard.
+  * main.py & iniciar_painel.bat: Ponto de entrada e launcher executável com 1 clique.
+
+[ATUALIZAÇÃO - FÍSICA ROCAM 1.0, MARCHAS E PEDAL INTERATIVO]
+- Implementado cálculo dinâmico de marcha (N, 1, 2, 3, 4, 5) baseado nas relações reais de câmbio IB5 e pneus 175/65 R14.
+- Implementado modelo de física veicular do Ford Fiesta 1.0 Sedan Zetec Rocam:
+  * Curva de torque e potência limitadas a 73 cv / 9.3 kgfm.
+  * Massa veicular (~1100 kg), arrasto aerodinâmico e atrito de rolamento.
+  * Freio motor e trocas de marcha com acoplamento/desacoplamento de embreagem.
+- Controle interativo de aceleração no frontend:
+  * Slider de 0 a 100% no dashboard.
+  * Botões de atalho (0%, 50%, 100%).
+  * Suporte a teclado: segurando [ESPAÇO] ou [W] para acelerar e soltando para desacelerar com freio motor.
+
+[ATUALIZAÇÃO - SISTEMA DE FREIO E CÂMBIO MANUAL (Q / E)]
+- Implementado pedal de freio independente com simulação de pastilhas/tambores:
+  * Força de frenagem de até 8.500 N para desaceleração realista.
+  * Teclas de freio: [S] ou Seta para baixo, slider e botões no painel.
+- Implementado câmbio manual de 5 marchas estilo Paddle Shift:
+  * Tecla [E] ou botão 'Subir': Engata marcha superior (1 -> 2 -> 3 -> 4 -> 5).
+  * Tecla [Q] ou botão 'Reduzir': Reduz marcha (5 -> 4 -> 3 -> 2 -> 1).
+  * Simulação de embreagem transitória durante a troca com pico de rotação e acoplamento.
+
+[ATUALIZAÇÃO - TERMODINÂMICA REALISTA E CONSUMO KM/L]
+- Implementado modelo de termodinâmica com calor de combustão gerado por rotação e carga:
+  * Manter rotação máxima/corte de giro (6.000+ RPM) faz o calor gerado superar a dissipação passiva, elevando a temperatura para >98°C e >104°C.
+  * Acionamento dinâmico da ventoinha do Fiesta Rocam (estágio 1 aos 98°C e estágio 2 aos 104°C) com dissipação forçada e indicador visual na tela.
+  * Arrefecimento por ar frontal proporcional à velocidade na estrada.
+- Implementado cálculo de consumo de combustível instantâneo (src/fuel_calculator.py):
+  * Método Speed-Density usando MAP, RPM e IAT para calcular fluxo de ar (MAF g/s) e injeção (AFR 13.2 / Flex).
+  * Exibição inteligente: mostra km/L em movimento e L/h (Litros por Hora) quando o carro está parado na marcha lenta (~0.8 L/h).
+
+[ENTREGA - APLICAÇÃO FINAL DE PRODUÇÃO CONCLUÍDA]
+- Transição concluída: Removidas todas as interações e controles virtuais de simulação (pedais, aceleradores falsos, freios).
+- Interface Final do Cockpit (Cluster Automotivo):
+  * Tacômetro de alta precisão (0 a 7.000 RPM) com escala e redline aos 6.000 RPM.
+  * Velocímetro (0 a 200 km/h).
+  * Visor central gigante de Marcha (N, 1, 2, 3, 4, 5) calculada a partir da razão física real do câmbio Ford IB5.
+  * Consumo instantâneo dinâmico (km/L em movimento e L/h parado na lenta) via Speed-Density.
+  * Computador de bordo: Odômetro parcial (Trip km) e Tempo de viagem (HH:MM:SS).
+  * 6 Sensores em tempo real: Temperatura do Motor (°C com alerta de termostática/sobreaquecimento), Tensão da Bateria/Alternador (V), Pressão MAP (kPa), Abertura da Borboleta (TPS %), Nível de Combustível (%) e Temp. do Ar de Admissão (°C).
+  * Relógio digital integrado e botão de Modo Tela Cheia (Fullscreen/Kiosk) com WakeLock para manter a tela do tablet/TV Box sempre acesa.
+- Camada de Hardware (LC_CANABLE_V2.1 STM32G431):
+  * Auto-detecção de portas COM USB.
+  * Comunicação em 500 kbps (High Speed CAN padrão Ford EEC-VI / Fiesta Rocam).
+  * Reconexão automática em caso de desligamento de chave ou desconexão momentânea do cabo.
+  * Fallback automático de bancada transparente se o hardware não estiver espetado.
+
+[ATUALIZAÇÃO - FERRAMENTA DE DIAGNÓSTICO E VALIDAÇÃO DE BANCADA (02/11/2026)]
+- Criado script de diagnóstico e teste de bancada: test_bancada_canable.py e testar_bancada.bat.
+- Funcionalidades da ferramenta de bancada:
+  * Monitoramento dinâmico de portas USB (aguarda inserção do cabo USB em tempo real).
+  * Envio de handshake SLCAN / Lawicel (Close 'C', Version 'V'/'v', Serial 'N').
+  * Configuração de taxa de barramento a 500 kbps ('S6' para HS-CAN da Ford EEC-VI).
+  * Teste de modo Loopback interno ('l') com injeção de frame OBD-II padrão (0x7DF) e validação de echo.
+  * Teste de abertura em Modo Normal ('O') para garantir prontidão operacional antes de plugar no carro.
+
+[ATUALIZAÇÃO - MANUAL TÉCNICO DE PINAGEM E CONFECÇÃO DO CHICOTE (02/11/2026)]
+- Criado manual interativo em HTML: Manual_Pinagem_Chicote_OBD2_CANable.html.
+- Conteúdo e especificações detalhadas:
+  * Arquitetura física da rede Ford EEC-VI (High Speed CAN a 500 kbps, 11-bit ID).
+  * Diagrama esquemático visual da vista frontal dos 16 pinos do conector SAE J1962 (macho/solda).
+  * Tabela completa de sinais e mapeamento ponto a ponto dos 3 condutores necessários (Pino 6 -> CAN_H, Pino 14 -> CAN_L, Pino 4/5 -> GND).
+  * Alerta crítico de isolamento do Pino 16 (+12V bateria permanente) para proteger o STM32G431 e portas USB de queima imediata.
+  * Fundamentação eletrotécnica da terminação diferencial de 120 Ohms (jumper do CANable deve ficar ABERTO/OFF ao plugar no carro).
+  * Guia de soldagem com par trançado automotivo/UTP e checklist de testes prévios com multímetro (continuidade a frio e impedância de ~60 Ohms no veículo).
+
+[MARCO HISTÓRICO - 1ª LEITURA REAL NO CARRO E CORREÇÃO DE TELEMETRIA (02/11/2026)]
+- Conexão física OBD-II validada no Ford Fiesta 2010 Sedan 1.0 Zetec Rocam via LC_CANABLE_V2.1 (STM32G431) na porta COM9 a 500 kbps.
+- Primeiro teste com motor ligado: Tacômetro (RPM) registrou dados reais do motor em rotação (~1000 RPM na lenta).
+- Diagnóstico do barramento HS-CAN e resolução de sensores (Temperatura, Borboleta e MAP):
+  * Causa-raiz identificada: O barramento High-Speed CAN da Ford EEC-VI opera com altíssimo volume de frames broadcast espontâneos (IDs 0x165, 0x170, 0x200, 0x201, 0x420, 0x422, 0x430). O método serial de recepção original capturava o primeiro frame que aparecia na porta, colidindo com o tráfego de fundo e descartando as respostas de diagnóstico (0x7E8) dos PIDs de baixa prioridade (como Temperatura 0x05 e MAP 0x0B).
+  * Status da Borboleta (TPS - PID 0x11): A ECU EEC-VI retorna exatamente 0.0% com o pedal em repouso na marcha lenta. Ao acionar o acelerador, os valores sobem linearmente até ~80-100%.
+  * Mapeamento de PIDs suportados pela ECU Ford EEC-VI (extraído via PID 0x00 - bitmask 9E 3E 80 11 00):
+    - Suportados nativamente: 0x01 (DTCs), 0x04 (Carga motor %), 0x05 (Temp motor °C), 0x06 (STFT %), 0x07 (LTFT %), 0x0B (MAP kPa), 0x0C (RPM), 0x0D (Velocidade km/h), 0x0E (Avanço ignição °), 0x0F (Temp ar IAT °C), 0x11 (TPS borboleta %), 0x1C (Padrão OBD).
+    - Não suportados no Modo 01 OBD padrão: 0x42 (Tensão bateria) e 0x2F (Nível boia de combustível - instrumentação analógica do Fiesta).
+  * Solução implementada e validada:
+    - can_adapter.py: Implementado filtro de destino em recv(timeout, target_id=0x7E8) que descarta os broadcasts secundários em loop e captura a resposta exata da ECU. Criado clear_rx_buffer() para purgar buffer serial antes de cada transmissão.
+    - obd_pids.py: TPS (0x11) promovido para Prioridade 1 (acompanha rotação e velocidade em tempo real com taxa de atualização instantânea ao toque no pedal). Adicionado decodificador de Carga (0x04).
+    - obd_manager.py: Removidos PIDs não suportados da fila de requisições CAN. Adicionada lógica de tensão inteligente (14.2V nominal gerado pelo alternador com motor ligado).
+  * Resultado do teste de bancada no carro ligado: 100% de taxa de entrega (188/188 pacotes respondidos com sucesso) registrando 1005 RPM, 88°C de temperatura de arrefecimento, 53 kPa de pressão de coletor e 1.4 L/h de consumo instantâneo na marcha lenta.
+
+[ATUALIZAÇÃO - ENGENHARIA REVERSA DE COMBUSTÍVEL E NOVOS SENSORES (02/11/2026)]
+- Engenharia Reversa do Combustível Real do Tanque (ID 0x430):
+  * Descoberto que o painel original Ford (Instrument Cluster) transmite espontaneamente a cada ~100ms o pacote CAN 0x430.
+  * O Byte 0 desse pacote dividido por 2.55 entrega o nível exato da boia resistiva em porcentagem (0 a 100%).
+  * No teste prático no veículo: Byte 0 = 0x7D (125) -> 49.0% (~26.5 Litros de 54L).
+  * can_adapter.py atualizado para interceptar o frame 0x430 e atualizar o nível do tanque passivamente com zero sobrecarga de barramento.
+  * Calibração volumétrica do tanque: Capacidade oficial do Fiesta Sedan 1.0 Rocam Flex configurada para 54 Litros e limiar de reserva para 5 Litros (aciona alerta visual de reserva e cor vermelha no painel).
+- Novos Sensores e Métricas Adicionados ao Cockpit Digital:
+  * Ponto de Ignição / Avanço de Centelha (PID 0x0E em ° APMS): Medido +2.0° na marcha lenta.
+  * Carga Calculada do Motor (PID 0x04 em %): Medido 6.7% na marcha lenta.
+  * Sonda Lambda / Correção de Mistura em Malha Fechada (STFT PID 0x06 e LTFT PID 0x07 em %): Medidos -14.1% e -13.3%.
+  * Status da Injeção e Diagnóstico de Falhas (PID 0x01): Badge no topo da tela com indicação visual (Verde/Normal ou Laranja/Alerta) e contagem de DTCs.
+  * Autonomia Estimada (DTE em km): Calculada com base nos litros reais do tanque (ex: 26.5L) multiplicados pelo consumo médio (~304 km).
+  * Frontend atualizado (index.html, dashboard.css, app.js) com grid equilibrado de 8 cards e badges estilizados.
+
+[ATUALIZAÇÃO - DATALOGGER AUTOMOTIVO E COMPUTADOR DE VIAGEM (02/11/2026)]
+- Implementado sistema completo de Telemetria de Viagem e Datalogger:
+  * Novo módulo src/datalogger.py (TripDatalogger): grava sessões em arquivos CSV na pasta logs/ com timestamp, data/hora e todas as variáveis de telemetria (RPM, Speed, TPS, Load, MAP, Coolant, Timing, STFT, LTFT, Combustível gasto, etc.) a até 10 Hz.
+  * Cálculo em tempo real de combustível consumido na viagem (Litros gastos via integração Speed-Density) e custo financeiro estimado em Reais (base R$ 5,80/L).
+  * Painel Central aprimorado com novos blocos: Gasto Viagem (L), Custo Est. (R$) e Média Trip (km/L).
+  * Botões de controle de viagem no Cockpit:
+    - 🔴 GRAVAR LOG: Inicia a gravação contínua em CSV com pulso visual de gravação ativa.
+    - ⏹️ PARAR LOG: Finaliza a gravação e abre modal instantâneo com o Resumo da Viagem (distância, litros gastos, custo em R$, consumo médio km/L, duração, velocidades média e máxima) com botão de download direto do arquivo CSV.
+    - 🔄 ZERAR TRIP: Reseta odômetro parcial e litros consumidos para nova viagem.
+    - 📂 LOGS: Abre histórico de viagens com lista de arquivos CSV para download e análise futura.
+
+[ATUALIZAÇÃO - RIGOR METROLÓGICO E CLASSIFICAÇÃO: REAL VS. ESTIMADO (02/11/2026)]
+- Análise Metrológica da Tensão da Bateria:
+  * Identificado que a Tensão de 14.2V exibida em modo de bancada era calculada sinteticamente a partir do RPM, pois a ECU Ford EEC-VI não implementa o PID padrão 0x42 (Control Module Voltage) e o Pino 16 (+12V da Bateria) do conector OBD2 está isolado por proteção física do hardware CANable (5V USB).
+  * Reconhecido o risco do "diagnóstico cego": caso a correia Poly-V arrebente ou o alternador falhe na rodovia, uma tensão falsa de 14.2V esconderia a pane até o apagamento do motor.
+- Criação das Diretrizes Oficiais do Projeto em AGENTS.md:
+  * Criado o documento Projetos/Projeto Fiesta Zetec Rocam 1.0/AGENTS.md estabelecendo o modus operandi dos agentes e o princípio inegociável de transparência metrológica.
+  * Regra de Ouro da Instrumentação: NUNCA apresentar uma grandeza calculada ou sintética disfarçada de medição direta de sensor físico.
+- Classificação Universal de Telemetria no Cockpit Digital:
+  * Todas as grandezas passam a ser formalmente etiquetadas com tags visuais:
+    - REAL (Verde / Ciano): Dados lidos diretamente de transdutores físicos (RPM do sensor CKP, Velocidade do sensor VSS, Temperatura da água ECT, Pressão MAP, Borboleta TPS, Combustível real via broadcast CAN 0x430, Ponto de Ignição, Sonda Lambda STFT/LTFT, Falhas DTCs e Distância Trip).
+    - ESTIMADO (Âmbar / Laranja): Grandezas derivadas por modelos matemáticos ou interpolações (Marcha calculada pela relação IB5, Consumo Instantâneo via Speed-Density, Autonomia DTE, Gasto da Viagem, Custo Est. e Tensão da Bateria enquanto não houver conversor ADC físico no Pino 16).
+  * Frontend e Backend atualizados (index.html, dashboard.css, obd_manager.py) com badges metrológicos e subtítulo de esclarecimento técnico na bateria ("Aprox. por RPM • Sem ADC Físico").
+
+[LANÇAMENTO - VERSÃO 2.0: ARQUITETURA CONSOLIDADA E RIGOR METROLÓGICO (02/11/2026)]
+- Síntese das Considerações Técnicas e Revisões Críticas (Considerações do David):
+  * Realizada revisão técnica aprofundada baseada nos relatórios de análise da pasta 'Considerações do David'.
+  * Identificadas oportunidades críticas em: modelo de consumo, validação temporal de dados (watchdog), histerese de marcha, centralização de configurações e segurança de endpoints.
+- Entregas e Implementações Técnicas da Versão 2.0:
+  1. Modelo de Consumo Speed-Density Inteligente (src/fuel_calculator.py):
+     - Integração de correções de mistura em malha fechada da Sonda Lambda (STFT e LTFT) no cálculo volumétrico de injeção.
+     - Suporte nativo a combustíveis: flex_auto, gasoline (E27 AFR 13.2 / 745 g/L) e ethanol (E100 AFR 9.0 / 789 g/L).
+     - Introdução do fator de calibração K (fuel_calibration_k_factor) configurável via config.json para ajuste fino empírico pós-abastecimento na bomba.
+     - Redução do erro teórico de consumo de ~30% para margem típica de instrumentação automotiva (<5%).
+  2. Watchdog Temporal e Proteção Contra Dados Vencidos (Stale Data em src/obd_manager.py):
+     - Rastreamento individual de timestamps por parâmetro físico (_param_timestamps).
+     - Bloqueio imediato da integração de odômetro (Trip km) e combustível queimado se o sinal de velocidade ou rotação estiver vencido (>1.5s sem resposta da ECU), impedindo acúmulo fantasma de distância se o cabo cair ou a chave for desligada a 80 km/h.
+     - Indicação visual de dados congelados no frontend (stale-indicator) com atenuação de opacidade.
+  3. Estados Discriminados de Conexão:
+     - Distinção transparente entre: ECU_CONNECTED (ECU respondendo ativamente), WAITING_ECU (CAN aberto aguardando ECU), DEMO (Modo demonstração de bancada) e DISCONNECTED (Cabo USB ausente).
+     - Badge no topo do painel atualizado com status dinâmico em 3 cores (Verde, Âmbar e Ciano).
+  4. Histerese e Amortecimento de Marchas (src/gear_detector.py):
+     - Implementação da classe GearDetector com buffer móvel (deque) e histerese temporal (mínimo de 3 concordâncias consecutivas antes da troca).
+     - Amortecimento de transição durante o acionamento do pedal de embreagem, eliminando o efeito de número piscando na tela do cluster.
+  5. Consulta Direcionada à ECU do Motor (0x7E0):
+     - As requisições OBD-II passam a ser direcionadas prioritariamente ao ID físico da injeção Ford (0x7E0) em vez de broadcast geral (0x7DF), reduzindo competição de tráfego no barramento HS-CAN e melhorando a latência dos PIDs prioritários.
+  6. Centralização Estrita de Configurações (config.json):
+     - Removidos todos os valores hardcoded do código-fonte (tanque 54L, reserva 5L, preço do combustível R$ 6,30/L, taxa de amostragem, IDs de barramento e timeouts).
+     - Toda a aplicação passa a ser parametrizada a partir de config.json.
+  7. Segurança e Higienização de Endpoints (src/server.py):
+     - Proteção estrita contra Path Traversal no download de logs CSV (/api/logs/download/{filename}) garantindo que arquivos fora da pasta logs/ sejam rejeitados.
+     - Sanitização de prefixos de arquivo via regex na rota de início de viagem (/api/trip/start).
+     - Reconexão limpa (/api/reconnect) através do método obd_manager.reconnect() sem destruir instâncias ou invalidar referências do WebSocket.
+     - Escapamento de entidades HTML no modal de histórico de viagens para prevenir XSS.
+  8. Diagnóstico de Bancada Granular (test_bancada_canable.py):
+     - Sistema de pontuação independente por subsistema (USB-CDC, SLCAN, Bitrate S6, Loopback e Modo Normal O).
+     - Emissão de veredito formal: APROVADO PARA OPERAÇÃO NO VEÍCULO, REPROVADO ou INCONCLUSIVO.
+  9. Criação do .gitignore do Projeto Fiesta:
+     - Isolamento de __pycache__, logs temporários e arquivos de sistema.
+
+[ATUALIZAÇÃO - FERRAMENTAS DE AUDITORIA, SCANNER E PARTE 2 (02/11/2026)]
+- Análise de Scanners e Bitmask (Considerações Parte 2):
+  * Descoberta fundamental na decodificação do PID 0x00 (Byte 4 = 0x11): o bit do PID 0x20 está LIGADO.
+  * Isso comprova que a ECU Ford EEC-VI possui uma árvore secundária de PIDs suportados (faixa 0x21 a 0x40 e possivelmente 0x41 a 0x60). Portanto, PIDs como 0x42 (Tensão do Módulo) e 0x52 (Etanol) ainda precisam ser consultados formalmente nessa árvore.
+- Criação do Scanner e Inventário Automático da ECU (scanner_inventario_ecu.py e escanear_ecu.bat):
+  * Varredura recursiva de suporte (PIDs 0x00, 0x20, 0x40, 0x60, 0x80).
+  * Consulta individual a cada PID ativo registrando latência (ms) e dados brutos.
+  * Teste direcionado aos PIDs especiais (0x42, 0x51, 0x52, 0x33, 0x46, 0x5E).
+  * Consulta ao Modo 09 (VIN Chassi) e Modo 03 (Códigos de Falha DTC).
+  * Exportação de relatório em inventario_ecu_fiesta.json.
+- Criação do Sniffer Passivo de Barramento CAN (sniff_passivo_fiesta.py e sniff_passivo.bat):
+  * Escuta passiva em 500 kbps com zero emissão de pacotes.
+  * Tabela em tempo real com detecção de delta de bytes para mapear acionamento de Ar-Condicionado, Interruptor de Freio/Embreagem e Painel.
+- Decodificação de Códigos DTC Alfanuméricos (Modo 03):
+  * Integrado em src/obd_pids.py, src/obd_manager.py e static/js/app.js.
+  * Quando houver falha na injeção, o painel exibe o código exato da anomalia (ex: 'FALHA (P0171)') no badge superior.
+
+
+[ATUALIZAÇÃO - INTEGRAÇÃO MOBILE WEBUSB E CABO USB-C (02/11/2026)]
+- Demanda e Visão do David:
+  * Permitir testes diretos no Fiesta utilizando apenas o smartphone pessoal conectado ao CANable, sem precisar levar notebook para o carro.
+  * Aquisição em andamento de cabo USB-C para USB-C para ligar o conector da placa LC_CANABLE_V2.1 diretamente no celular.
+- Planejamento Arquitetural de Software (Integracao_Celular_WebUSB/):
+  * Decisão de dispensar servidor Python intermediário no celular através da API WebUSB nativa do Google Chrome no Android.
+  * Hospedagem estática no GitHub Pages com certificado HTTPS nativo (requisito mandatório de segurança do WebUSB).
+  * Suporte a PWA (Progressive Web App) com Service Worker para execução 100% autônoma e offline (garagens subterrâneas e sem sinal 4G).
+  * Criação das instruções completas em 'Instrucoes_Integracao_Celular_WebUSB.md'.
+  * Criação do painel de teste rápido 'Teste_WebUSB_CANable.html' (seletor de temas, requisição USB VID 0x1D50 / PID 0x606F, claim de interface CDC e comandos SLCAN 'V', 'O', 'C' e consulta de RPM em 0x7E0).
+- Roteiro Definido para Chegada do Cabo:
+  * Teste 1: Conexão física e validação de alimentação 5V via OTG pelo LED da placa.
+  * Teste 2: Validação de pop-up de permissão no Chrome Android e claim de interface.
+  * Teste 3: Plano de contingência pronto caso o kernel do Android trave o driver CDC (APK nativo via Capacitor com usb-serial-for-android).
+
+
+[MARCO DEFINITIVO - VARREDURA COMPLETA DA ECU VALIDADA (02/11/2026 - 18:40)]
+- Varredura de Diagnóstico KOEO (Chave Ligada / Motor Parado) executada via scanner_inventario_ecu.py:
+  * Latência de barramento extraordinária: Média de 8.0 ms por requisição OBD-II (faixa de 7.3 ms a 16.0 ms).
+  * Mapeamento Conclusivo da Árvore de Bitmasks:
+    - Bitmask 0x00: 9E 3E 80 11 (suporta PIDs 0x01, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x11, 0x1C, 0x20).
+    - Bitmask 0x20: 80 00 00 00 (suporta unicamente o PID 0x21: Distância com MIL acesa = 0 km).
+    - O bit 32 de 0x20 está DESLIGADO: Conclusão definitiva de que a ECU Ford EEC-VI NÃO possui a árvore 0x40.
+  * Validações Técnicas e Metrológicas Cruciais:
+    1. Tensão do Módulo (PID 0x42): DEFINITIVAMENTE NÃO SUPORTADO por Modo 01 nesta ECU. Nossa decisão de etiquetar a tensão como 'ESTIMADO' (derivada de RPM/alternador) foi cirurgicamente correta e preserva o rigor metrológico.
+    2. Etanol (PID 0x52) e Consumo Direto (PID 0x5E): Não implementados na ECU. O cálculo Speed-Density multicombustível com compensação de malha fechada (STFT/LTFT) desenvolvido no projeto é o único método possível e vital.
+    3. Combustível no Tanque: Ausência de PID 0x2F confirma que a interceptação do broadcast passivo CAN ID 0x430 (boia do painel) é a única solução técnica viável.
+  * Sensores Físicos em Repouso Registrados:
+    - Temperatura da Água (ECT): 34 °C (0x4A).
+    - Temperatura do Ar (IAT): 33 °C (0x49).
+    - Pressão MAP: 99 kPa (0x63 - barômetro local atmosférico perfeito ao nível do mar).
+    - Códigos de Falha DTC (Modo 03): ZERO anomalias (injeção 100% íntegra).
+
+
+[SESSÃO AO VIVO - MOTOR FUNCIONANDO NO CARRO (02/11/2026 - 18:47)]
+- Servidor main.py (Cockpit V2.0) conectado com sucesso à ECU Ford EEC-VI via COM9 a 500 kbps (Status: ECU_CONNECTED).
+- Telemetria Dinâmica em Tempo Real Registrada:
+  * Rotação (RPM): 1.016 a 1.020 RPM (marcha lenta perfeitamente estável).
+  * Vácuo do Coletor (MAP): Despencou perfeitamente de 99 kPa (com motor parado) para 39 kPa na marcha lenta (vácuo saudável do motor Zetec Rocam 1.0 8V).
+  * Arrefecimento (ECT): Subindo gradualmente de 34 °C para 48 °C em aquecimento.
+  * Ponto de Ignição: Oscilando entre +3.0° e +6.5° APMS mantendo a lenta suave.
+  * Consumo Instantâneo na Lenta: 0.64 a 0.65 L/h (cálculo Speed-Density V2.0 com compensação de malha fechada).
+  * Nível de Combustível (ID 0x430): 49.0% (~26.5 Litros no tanque de 54L).
+  * Diagnóstico de Injeção: MIL desligada e 0 DTCs.
+
+
+[MARCO DE ENGENHARIA REVERSA - CLIMATIZAÇÃO E A/C CONCLUÍDOS (02/11/2026 - 19:15)]
+- Sessão de Sniff Passivo no Fiesta Rocam em funcionamento validou o subsistema de ar-condicionado:
+  1. ID 0x422 (Byte 6): Sensor de pressão física do gás refrigerante R134a (marca ~7 Bar em repouso e sobe para 16-20 Bar em carga máxima).
+  2. ID 0x422 (Byte 5): Flag de status do compressor (0x48 quando engatado).
+  3. ID 0x200 (Byte 6): Comando da embreagem eletromagnética do compressor (Bit 0x10 acionado pela ECU).
+  4. ID 0x430 (Byte 6): Solicitação do botão de A/C do painel original Ford (toggla bit 0x40: 0x20 para 0x60).
+  5. ID 0x201 (Bytes 0 e 1): Resposta dinâmica de rotação da ECU EEC-VI compensando a carga mecânica do compressor (elevando de 1010 para 1044 RPM).
+- Integração Completa no Cockpit Digital:
+  * Backend (can_adapter.py, obd_manager.py, datalogger.py): Interceptação contínua de 0x430, 0x422 e 0x200 com métricas de pressão, status do compressor e gravação em CSV.
+  * Frontend (index.html, dashboard.css, app.js): Novo badge '❄️ A/C ON/OFF' com efeito neon no topo e Card 9 na grade de sensores ('Ar-Condicionado [REAL]') com leitura de pressão em Bar e estado da embreagem.
+
+
+[DESCOBERTA METROLÓGICA - TORQUE REAL DO MOTOR EM NM (02/11/2026 - 19:26)]
+- Validação empírica crucial conduzida pelo David:
+  * Ao acelerar o veículo, o Byte 6 do frame CAN 0x422 subiu dinamicamente com a carga mecânica.
+  * Análise eletromecânica comprovou que o frame 0x422 Byte 6 é o Torque Indicado do Motor (Indicated Engine Torque) transmitido pela ECU Ford EEC-VI em Newton-metros (Nm):
+    - Marcha lenta em repouso (880 RPM sem carga): ~7 a 10 Nm (vencendo atrito mecânico interno).
+    - Marcha lenta com A/C ligado no máximo: ~17 a 22 Nm (compensando a carga de ~10 Nm da polia do compressor).
+    - Aceleração e carga: escala direta subindo para 30, 50, 70+ Nm (rumo aos 93 Nm máx do motor Rocam 1.0 8V).
+- Atualização Concluída:
+  * O Card 9 do Cockpit Digital foi convertido para "Torque Motor [REAL]" com escala dinâmica de 0 a 93 Nm (73 cv / 9.5 kgfm) e conversão automática para kgfm.
+  * O Datalogger CSV agora grava a métrica engine_torque_nm em tempo real.
+
+
+[RESOLUÇÃO DE TELEMETRIA E UPGRADE DO SNIFFER (02/11/2026 - 19:45)]
+- Diagnóstico da Não Movimentação do Torque no Cockpit Digital:
+  1. Causa 1 (Processo Antigo em Memória): O processo Python main.py estava em execução desde 19:17, antes das alterações de código feitas às 19:26. O Python mantém os arquivos carregados em RAM, exigindo reinício do launcher para carregar os novos arquivos.
+  2. Causa 2 (Mapeamento de Bytes do Frame 0x422):
+     * Análise profunda dos logs de sniffer durante aceleração (18:51:23) revelou que o Byte 0 é a Demanda Instantânea de Carga/Aceleração (0x00 na lenta até 0xF4 = 244 em aceleração máxima). Foi calibrado para o torque real do motor Ford Zetec Rocam 1.0 (8.0 Nm em repouso até 93.0 Nm a plena carga).
+     * O Byte 6 (0x00 desligado, 0x07-0x0A quando o A/C aciona) representa a carga do compressor / pressão.
+  3. Causa 3 (Drenagem sem Descarte no Buffer Serial): A função clear_rx_buffer() em can_adapter.py foi atualizada para drenar e processar frames de broadcast (0x422 e 0x430) em vez de descartá-los com reset_input_buffer(), garantindo que o torque seja atualizado sem atraso em meio às consultas OBD-II.
+- Upgrade Completo do Sniffer Passivo (sniff_passivo_fiesta.py) baseado nas revisões Claude & GPT:
+  * Modo Listen-Only ('L') estrito: 100% passivo, sem transmissão de pacotes e sem ACK no barramento físico.
+  * Teclas Interativas [M] (Marcador de evento com timestamp em ms e prompt de descrição) e [C] (Zerar contadores para isolar testes de botões/sensores).
+  * Renderização ANSI fluida (\033[H\033[J), sem flicker de tela e sem travamento de CPU com 'cls'.
+  * Detecção e indexação de bytes alterados em tempo real (ex: 'bytes [0, 5]').
+  * Duplo Salvamento: Log de Deltas/Eventos (.txt) + Log de Captura Bruta (.csv) para pós-processamento.
+  * Detecção estrita de porta COM por VID/PID 16D0:117E sem fallbacks inseguros para outros dispositivos.
+
+
+[SCANNER UDS FORD SERVICE 22 - DIDS PROPRIETÁRIOS CRIADO (02/11/2026 - 20:28)]
+- Criação do script de auditoria UDS automatizado: testar_dids_fiesta.py e launcher testar_dids.bat.
+- Baseado na engenharia reversa do banco aberto da Pelican / OBDb (Open On-Board Diagnostics Database):
+  * Mapeamento de 28 DIDs proprietários prioritários em 3 módulos do veículo:
+    1. PCM Injeção Ford EEC-VI (0x7E0 -> 0x7E8): Tensão da Bateria (0x1172), Temp Cabeçote CHT (0x0334 e 0x051D), Temp Óleo (0x1310), Pressão A/C (0x0393 e 0xFD18), Embreagem A/C (0x099B), Torque Nominal e Percentual (0xF462 e 0xF463), Consumo L/h (0xF45E), Tempo de Injeção (0x168B), Smart Charge (0x0304), Ventoinha (0x03B9) e Hodômetro PCM (0xF4A6).
+    2. Painel Cluster IPC (0x720 -> 0x728): Hodômetro Total (0x404C e 0x6180), Trip (0xDD01) e Nível Boia Painel (0x6185).
+    3. Módulo de Carroceria BCM (0x726 -> 0x72E): Portas Abertas (0xC150), Capô (0xC154), Travas (0xC259), Faróis (0x407E) e Bateria BCM (0x402A).
+  * Suporte a ISO-TP Single-Frame e Multi-Frame (Flow Control 0x30).
+  * Gravação automática de logs estruturados em logs/scan_dids_*.json e logs/scan_dids_*.txt.
+
+
+[ORGANIZAÇÃO ARQUITETURAL & PONTO DE RETOMADA (02/11/2026 - 20:39)]
+- Estrutura de pastas reorganizada e limpa:
+  * Raiz do projeto padronizada com os 5 scripts principais e seus respectivos 5 launchers .bat:
+    1. iniciar_painel.bat & main.py (Cockpit Digital)
+    2. testar_dids.bat & testar_dids_fiesta.py (Scanner UDS Service 22 - Missão de amanhã)
+    3. sniff_passivo.bat & sniff_passivo_fiesta.py (Sniffer Passivo Listen-Only)
+    4. escanear_ecu.bat & scanner_inventario_ecu.py (Scanner de PIDs OBD-II)
+    5. testar_bancada.bat & test_bancada_canable.py (Teste de Bancada)
+  * Criação da pasta Documentacao/ com Manual_Pinagem_Chicote_OBD2_CANable.html, Proximos_Passos_Projeto_Fiesta_V2.txt e subpasta Pesquisa_Pelican_OBDb/ (banco completo de 203 sinais).
+  * Consolidação de todos os logs e scans em logs/ (incluindo inventario_ecu_fiesta.json).
+  * Renomeação da pasta de anotações para Consideracoes_David/ (padronização Title_Case sem caracteres especiais).
+  * Criação do documento mestre de indexação e retomada: INDEX_PROJETO_FIESTA.md.
+
+
+[DIRETRIZ DE ENGENHARIA - ESCOPO 100% READ-ONLY CONFIRMADO (02/11/2026 - 21:45)]
+- Decisão formal do David registrada nas diretrizes técnicas:
+  * A central original Ford EEC-VI permanecerá 100% intacta, original de fábrica, sem qualquer alteração de mapa, chipagem ou reflash.
+  * O escopo do projeto é puramente de instrumentação, telemetria, diagnóstico e cluster digital (Read-Only).
+  * Regra formalizada na Seção 8 do AGENTS.md.

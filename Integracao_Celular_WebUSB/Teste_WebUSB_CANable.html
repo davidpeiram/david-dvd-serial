@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Teste WebUSB • CANable & Android</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.75);
+      --border: rgba(148, 163, 184, 0.15);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-rgb: 56, 189, 248;
+      --real: #00e676;
+      --estimado: #ffb300;
+      --danger: #ef4444;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    html[data-theme="light"] {
+      --bg: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.95);
+      --border: rgba(100, 116, 139, 0.2);
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #0284c7;
+      --accent-rgb: 2, 132, 199;
+      --real: #059669;
+      --estimado: #d97706;
+      --danger: #dc2626;
+    }
+
+    html[data-theme="campbell"] {
+      --bg: #0c0c0c;
+      --card-bg: #1f1f1f;
+      --border: #3a3a3a;
+      --text: #cccccc;
+      --text-muted: #767676;
+      --accent: #3b78ff;
+      --accent-rgb: 59, 120, 255;
+      --real: #16c60c;
+      --estimado: #f9f1a5;
+      --danger: #e74856;
+    }
+
+    html[data-theme="monokai"] {
+      --bg: #272822;
+      --card-bg: #3e3d32;
+      --border: #49483e;
+      --text: #f8f8f2;
+      --text-muted: #75715e;
+      --accent: #66d9ef;
+      --accent-rgb: 102, 217, 239;
+      --real: #a6e22e;
+      --estimado: #e6db74;
+      --danger: #f92672;
+    }
+
+    html[data-theme="cyberpunk"] {
+      --bg: #05050a;
+      --card-bg: #120b24;
+      --border: #ff007f;
+      --text: #00f0ff;
+      --text-muted: #a700ff;
+      --accent: #ffe600;
+      --accent-rgb: 255, 230, 0;
+      --real: #00ff66;
+      --estimado: #ffaa00;
+      --danger: #ff0055;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Top Bar */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .badge-target {
+      font-size: 0.7rem;
+      background: rgba(var(--accent-rgb), 0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .controls-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    select.theme-select {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+
+    /* Status Card */
+    .status-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .status-pill.connected {
+      background: rgba(0, 230, 118, 0.15);
+      color: var(--real);
+      border-color: var(--real);
+    }
+
+    .status-pill.pending {
+      background: rgba(255, 179, 0, 0.15);
+      color: var(--estimado);
+      border-color: var(--estimado);
+    }
+
+    /* Action Grid */
+    .grid-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+    }
+
+    button.btn-action {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 10px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    button.btn-action:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: rgba(var(--accent-rgb), 0.1);
+    }
+
+    button.btn-action:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    button.btn-primary {
+      background: rgba(var(--accent-rgb), 0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Terminal Console */
+    .terminal-container {
+      flex: 1;
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 250px;
+      max-height: 45vh;
+    }
+
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 6px;
+    }
+
+    .terminal-body {
+      flex: 1;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-line { word-break: break-all; }
+    .log-info { color: #94a3b8; }
+    .log-tx { color: #38bdf8; }
+    .log-rx { color: #00e676; }
+    .log-warn { color: #ffb300; }
+    .log-err { color: #ef4444; }
+
+    /* Custom Command */
+    .custom-cmd-bar {
+      display: flex;
+      gap: 8px;
+    }
+
+    .custom-cmd-bar input {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .custom-cmd-bar button {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span>🚗 Fiesta Rocam</span>
+      <span class="badge-target">WebUSB Tester</span>
+    </div>
+    <div class="controls-top">
+      <select class="theme-select" id="themeSelect" aria-label="Seletor de tema">
+        <option value="dark">🌙 Dark</option>
+        <option value="light">☀️ Light</option>
+        <option value="campbell">💻 Campbell</option>
+        <option value="monokai">🎨 Monokai</option>
+        <option value="cyberpunk">⚡ Cyberpunk</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="status-card">
+    <div class="status-row">
+      <span>Dispositivo USB:</span>
+      <span id="usbStatusPill" class="status-pill">Desconectado</span>
+    </div>
+    <div class="status-row">
+      <span style="color: var(--text-muted); font-size: 0.78rem;">Alvo: LC_CANABLE_V2.1 (STM32G431) • VID: 0x1D50 / PID: 0x606F</span>
+    </div>
+  </div>
+
+  <div class="grid-actions">
+    <button class="btn-action btn-primary" id="btnRequestUsb">
+      <strong>1. Solicitar USB</strong>
+      <span style="font-size: 0.7rem; color: var(--text-muted);">Pop-up do Android</span>
+    </button>
+    <button class="btn-action" id="btnOpenClaim" disabled>
+      <strong>2. Abrir Conexão</strong>
+      <span style="font-size: 0.7rem; color: var(--text-muted);">Claim Interface CDC</span>
+    </button>
+    <button class="btn-action" id="btnCheckVer" disabled>
+      <strong>3. Versão ('V')</strong>
+      <span style="font-size: 0.7rem; color: var(--text-muted);">Firmware CANable</span>
+    </button>
+    <button class="btn-action" id="btnOpenCan" disabled>
+      <strong>4. Abrir CAN ('O')</strong>
+      <span style="font-size: 0.7rem; color: var(--text-muted);">500 kbps (S6)</span>
+    </button>
+    <button class="btn-action" id="btnCloseCan" disabled>
+      <strong>5. Fechar CAN ('C')</strong>
+      <span style="font-size: 0.7rem; color: var(--text-muted);">Reset do Canal</span>
+    </button>
+    <button class="btn-action" id="btnQueryRpm" disabled>
+      <strong>6. Testar RPM</strong>
+      <span style="font-size: 0.7rem; color: var(--text-muted);">0x7E0 (PID 0x0C)</span>
+    </button>
+  </div>
+
+  <div class="custom-cmd-bar">
+    <input type="text" id="customInput" placeholder="Ex: V ou t7E0802010C00000000" disabled>
+    <button id="btnSendCustom" disabled>Enviar</button>
+  </div>
+
+  <div class="terminal-container">
+    <div class="terminal-header">
+      <span>LOG DE TRANSFERÊNCIA BULK USB</span>
+      <button id="btnClearLog" style="background:none; border:none; color:var(--text-muted); cursor:pointer;">Limpar</button>
+    </div>
+    <div class="terminal-body" id="termBody">
+      <div class="log-line log-info">[INFO] Sistema pronto. Conecte o cabo USB-C no celular e no CANable e clique em '1. Solicitar USB'.</div>
+    </div>
+  </div>
+
+  <script>
+    // --- Gerenciador de Tema ---
+    const themeSelect = document.getElementById('themeSelect');
+    const savedTheme = localStorage.getItem('fiesta_webusb_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeSelect.value = savedTheme;
+    themeSelect.addEventListener('change', (e) => {
+      document.documentElement.setAttribute('data-theme', e.target.value);
+      localStorage.setItem('fiesta_webusb_theme', e.target.value);
+    });
+
+    // --- Utilitários de Log ---
+    const termBody = document.getElementById('termBody');
+    function log(msg, type = 'info') {
+      const line = document.createElement('div');
+      line.className = `log-line log-${type}`;
+      const time = new Date().toLocaleTimeString();
+      line.textContent = `[${time}] ${msg}`;
+      termBody.appendChild(line);
+      termBody.scrollTop = termBody.scrollHeight;
+    }
+    document.getElementById('btnClearLog').addEventListener('click', () => {
+      termBody.innerHTML = '';
+      log('Log limpo.', 'info');
+    });
+
+    // --- Estado do WebUSB ---
+    let usbDevice = null;
+    let endpointIn = null;
+    let endpointOut = null;
+    let isReading = false;
+
+    const btnRequestUsb = document.getElementById('btnRequestUsb');
+    const btnOpenClaim = document.getElementById('btnOpenClaim');
+    const btnCheckVer = document.getElementById('btnCheckVer');
+    const btnOpenCan = document.getElementById('btnOpenCan');
+    const btnCloseCan = document.getElementById('btnCloseCan');
+    const btnQueryRpm = document.getElementById('btnQueryRpm');
+    const customInput = document.getElementById('customInput');
+    const btnSendCustom = document.getElementById('btnSendCustom');
+    const usbStatusPill = document.getElementById('usbStatusPill');
+
+    // 1. Solicitar Dispositivo USB
+    btnRequestUsb.addEventListener('click', async () => {
+      if (!('usb' in navigator)) {
+        log('ERRO: Seu navegador não suporta WebUSB! Utilize o Google Chrome no Android.', 'err');
+        return;
+      }
+
+      try {
+        log('Abrindo seletor nativo do Android...', 'info');
+        // Filtro pelo VID do CANable (0x1D50) e PID (0x606F) ou genérico
+        usbDevice = await navigator.usb.requestDevice({
+          filters: [
+            { vendorId: 0x1d50, productId: 0x606f },
+            { vendorId: 0x1d50 }
+          ]
+        });
+
+        log(`Dispositivo selecionado: ${usbDevice.productName || 'CANable'} (VID: 0x${usbDevice.vendorId.toString(16)}, PID: 0x${usbDevice.productId.toString(16)})`, 'rx');
+        usbStatusPill.textContent = 'Selecionado';
+        usbStatusPill.className = 'status-pill pending';
+        btnOpenClaim.disabled = false;
+      } catch (err) {
+        log(`Seleção cancelada ou falha: ${err.message}`, 'warn');
+      }
+    });
+
+    // 2. Abrir Conexão e Fazer Claim da Interface
+    btnOpenClaim.addEventListener('click', async () => {
+      if (!usbDevice) return;
+
+      try {
+        log('Tentando abrir conexão com o dispositivo...', 'info');
+        await usbDevice.open();
+        
+        log(`Configurações disponíveis: ${usbDevice.configurations.length}`, 'info');
+        await usbDevice.selectConfiguration(1);
+
+        // Localiza interface CDC de dados com endpoints IN e OUT
+        let targetInterface = null;
+        for (const iface of usbDevice.configuration.interfaces) {
+          for (const alt of iface.alternates) {
+            const hasIn = alt.endpoints.some(e => e.direction === 'in' && e.type === 'bulk');
+            const hasOut = alt.endpoints.some(e => e.direction === 'out' && e.type === 'bulk');
+            if (hasIn && hasOut) {
+              targetInterface = iface;
+              endpointIn = alt.endpoints.find(e => e.direction === 'in');
+              endpointOut = alt.endpoints.find(e => e.direction === 'out');
+              break;
+            }
+          }
+          if (targetInterface) break;
+        }
+
+        const ifaceNum = targetInterface ? targetInterface.interfaceNumber : 0;
+        log(`Reivindicando interface #${ifaceNum}...`, 'info');
+        await usbDevice.claimInterface(ifaceNum);
+
+        log(`Interface #${ifaceNum} reivindicada com sucesso! Endpoints: IN=#${endpointIn.endpointNumber}, OUT=#${endpointOut.endpointNumber}`, 'rx');
+        usbStatusPill.textContent = 'Conectado (USB)';
+        usbStatusPill.className = 'status-pill connected';
+
+        // Habilita controles
+        btnCheckVer.disabled = false;
+        btnOpenCan.disabled = false;
+        btnCloseCan.disabled = false;
+        btnQueryRpm.disabled = false;
+        customInput.disabled = false;
+        btnSendCustom.disabled = false;
+
+        // Inicia loop de leitura contínua
+        startReading();
+      } catch (err) {
+        log(`FALHA AO ABRIR INTERFACE: ${err.message}`, 'err');
+        if (err.message.includes('claimInterface') || err.message.includes('SecurityError')) {
+          log('ALERTA: O kernel do Android assumiu o driver CDC antes do Chrome. Considere usar o contêiner APK nativo com usb-serial-for-android.', 'warn');
+        }
+      }
+    });
+
+    // Enviar string ASCII pelo endpoint OUT
+    async function sendString(str) {
+      if (!usbDevice || !endpointOut) return;
+      try {
+        const fullStr = str.endsWith('\r') ? str : (str + '\r');
+        const encoder = new TextEncoder();
+        const data = encoder.encode(fullStr);
+        log(`TX -> ${fullStr.trim()}`, 'tx');
+        await usbDevice.transferOut(endpointOut.endpointNumber, data);
+      } catch (err) {
+        log(`Erro ao transmitir TX: ${err.message}`, 'err');
+      }
+    }
+
+    // Leitura contínua pelo endpoint IN
+    async function startReading() {
+      if (isReading || !usbDevice || !endpointIn) return;
+      isReading = true;
+      const decoder = new TextDecoder();
+
+      while (isReading && usbDevice.opened) {
+        try {
+          const result = await usbDevice.transferIn(endpointIn.endpointNumber, 64);
+          if (result.data && result.data.byteLength > 0) {
+            const text = decoder.decode(result.data);
+            log(`RX <- ${text.trim()}`, 'rx');
+          }
+        } catch (err) {
+          if (isReading) {
+            log(`Interrupção na leitura RX: ${err.message}`, 'warn');
+          }
+          break;
+        }
+      }
+      isReading = false;
+    }
+
+    // Comandos Predefinidos
+    btnCheckVer.addEventListener('click', () => sendString('V'));
+    btnOpenCan.addEventListener('click', async () => {
+      await sendString('C'); // Fecha canal antes
+      await sendString('S6'); // 500 kbps
+      await sendString('O');  // Abre canal
+    });
+    btnCloseCan.addEventListener('click', () => sendString('C'));
+    btnQueryRpm.addEventListener('click', () => sendString('t7E0802010C00000000'));
+
+    btnSendCustom.addEventListener('click', () => {
+      const val = customInput.value.trim();
+      if (val) {
+        sendString(val);
+        customInput.value = '';
+      }
+    });
+    customInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') btnSendCustom.click();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual Técnico: Pinagem e Chicote OBD-II para LC_CANABLE_V2.1 | Ford Fiesta 1.0 Rocam</title>
+  
+  <!-- Tipografia Editorial do Workspace: Plus Jakarta Sans e JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+
+  <!-- MathJax 3 para Notações de Impedância Elétrica -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    /* ==========================================================================
+       1. SISTEMA MULTITEMA PADRÃO DO WORKSPACE (DARK, LIGHT, CAMPBELL, MONOKAI, CYBERPUNK)
+       ========================================================================== */
+    html[data-theme="dark"], :root {
+      --bg: #090e17;
+      --card-bg: #121c2e;
+      --card-hover: #18263e;
+      --card-border: #1e314f;
+      --card-subtle: #0f1726;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --primary-glow: rgba(56, 189, 248, 0.15);
+      --secondary: #818cf8;
+      --accent: #f59e0b;
+      --accent-glow: rgba(245, 158, 11, 0.15);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.15);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.15);
+      --table-header: #152238;
+      --table-stripe: rgba(255, 255, 255, 0.02);
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    html[data-theme="light"] {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --card-hover: #f1f5f9;
+      --card-border: #cbd5e1;
+      --card-subtle: #f8fafc;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #94a3b8;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --primary-glow: rgba(2, 132, 199, 0.12);
+      --secondary: #6366f1;
+      --accent: #d97706;
+      --accent-glow: rgba(217, 119, 6, 0.12);
+      --success: #059669;
+      --success-glow: rgba(5, 150, 105, 0.12);
+      --danger: #dc2626;
+      --danger-glow: rgba(220, 38, 38, 0.12);
+      --table-header: #e2e8f0;
+      --table-stripe: rgba(0, 0, 0, 0.02);
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+    }
+
+    html[data-theme="campbell"] {
+      --bg: #012456;
+      --card-bg: #0c3168;
+      --card-hover: #134287;
+      --card-border: #1e529d;
+      --card-subtle: #08285c;
+      --text: #f0f4f8;
+      --text-muted: #a5c2eb;
+      --text-dim: #7393bd;
+      --primary: #eedc82;
+      --primary-hover: #fff0a6;
+      --primary-glow: rgba(238, 220, 130, 0.2);
+      --secondary: #38bdf8;
+      --accent: #16c60c;
+      --accent-glow: rgba(22, 198, 12, 0.2);
+      --success: #16c60c;
+      --success-glow: rgba(22, 198, 12, 0.2);
+      --danger: #e74856;
+      --danger-glow: rgba(231, 72, 86, 0.2);
+      --table-header: #07224f;
+      --table-stripe: rgba(255, 255, 255, 0.02);
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    html[data-theme="monokai"] {
+      --bg: #272822;
+      --card-bg: #1e1f1c;
+      --card-hover: #32332d;
+      --card-border: #49483e;
+      --card-subtle: #171814;
+      --text: #f8f8f2;
+      --text-muted: #8f908a;
+      --text-dim: #75715e;
+      --primary: #66d9ef;
+      --primary-hover: #50c4db;
+      --primary-glow: rgba(102, 217, 239, 0.2);
+      --secondary: #ae81ff;
+      --accent: #fd971f;
+      --accent-glow: rgba(253, 151, 31, 0.2);
+      --success: #a6e22e;
+      --success-glow: rgba(166, 226, 46, 0.2);
+      --danger: #f92672;
+      --danger-glow: rgba(249, 38, 114, 0.2);
+      --table-header: #383830;
+      --table-stripe: rgba(255, 255, 255, 0.03);
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    html[data-theme="cyberpunk"] {
+      --bg: #0d0221;
+      --card-bg: #19053b;
+      --card-hover: #260957;
+      --card-border: #ff007f;
+      --card-subtle: #11032b;
+      --text: #00f0ff;
+      --text-muted: #d094ff;
+      --text-dim: #8b5cf6;
+      --primary: #ffe600;
+      --primary-hover: #fff366;
+      --primary-glow: rgba(255, 230, 0, 0.25);
+      --secondary: #ff007f;
+      --accent: #ff007f;
+      --accent-glow: rgba(255, 0, 127, 0.25);
+      --success: #00ff66;
+      --success-glow: rgba(0, 255, 102, 0.25);
+      --danger: #ff0055;
+      --danger-glow: rgba(255, 0, 85, 0.25);
+      --table-header: #260a54;
+      --table-stripe: rgba(255, 0, 127, 0.04);
+      --shadow: 0 0 25px rgba(255, 0, 85, 0.25);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      padding: 0 1rem 4rem;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+
+    /* ==========================================================================
+       2. CONTROLES SUPERIORES (COMPACTOS, RETRÁTEIS)
+       ========================================================================== */
+    .top-controls {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 0.5rem 1rem;
+      margin: 0 -1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    .nav-breadcrumbs {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .nav-breadcrumbs a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .nav-breadcrumbs a:hover {
+      text-decoration: underline;
+    }
+    .right-tools {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .theme-select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* ==========================================================================
+       3. HERO BANNER
+       ========================================================================== */
+    .hero-banner {
+      background: linear-gradient(135deg, var(--card-bg) 0%, var(--card-subtle) 100%);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 2.2rem 2rem;
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .hero-banner::after {
+      content: "";
+      position: absolute;
+      top: -40%;
+      right: -10%;
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .module-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      background: var(--primary-glow);
+      border: 1px solid var(--primary);
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      margin-bottom: 0.8rem;
+    }
+    .hero-banner h1 {
+      font-size: 2.1rem;
+      font-weight: 800;
+      line-height: 1.25;
+      margin-bottom: 0.8rem;
+      color: var(--text);
+    }
+    .hero-banner p {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 820px;
+      margin-bottom: 1.2rem;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--primary);
+      color: #000;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+    .btn-action:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+    }
+    .btn-action.secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      box-shadow: none;
+    }
+    .btn-action.secondary:hover {
+      background: var(--card-hover);
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    /* ==========================================================================
+       4. SUMÁRIO RETRÁTIL
+       ========================================================================== */
+    .summary-drawer {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .summary-drawer summary {
+      padding: 0.8rem 1.2rem;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+      color: var(--text);
+      background: var(--card-subtle);
+    }
+    .summary-drawer summary::-webkit-details-marker { display: none; }
+    .summary-drawer summary::after {
+      content: "▾";
+      font-size: 1.1rem;
+      color: var(--primary);
+      transition: transform 0.2s ease;
+    }
+    .summary-drawer[open] summary::after {
+      transform: rotate(180deg);
+    }
+    .drawer-content {
+      padding: 1.2rem 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.75rem;
+      border-top: 1px solid var(--card-border);
+    }
+    .drawer-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      transition: background 0.2s ease;
+    }
+    .drawer-item:hover {
+      background: var(--card-hover);
+      color: var(--primary);
+    }
+    .drawer-item span.num {
+      color: var(--primary);
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    /* ==========================================================================
+       5. SEÇÕES E CARDS PEDAGÓGICOS
+       ========================================================================== */
+    .section-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow);
+    }
+    .section-title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      margin-bottom: 1.2rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      border-bottom: 2px solid var(--primary-glow);
+      padding-bottom: 0.5rem;
+    }
+    .section-title .section-num {
+      background: var(--primary-glow);
+      color: var(--primary);
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--primary);
+    }
+    p, li {
+      margin-bottom: 0.85rem;
+      color: var(--text);
+    }
+    ul, ol {
+      padding-left: 1.4rem;
+      margin-bottom: 1rem;
+    }
+    strong {
+      color: var(--text);
+      font-weight: 700;
+    }
+    em {
+      font-style: italic;
+      color: var(--text-muted);
+    }
+
+    /* Boxes de Destaque */
+    .callout {
+      border-radius: 10px;
+      padding: 1.2rem 1.4rem;
+      margin: 1.4rem 0;
+      position: relative;
+    }
+    .callout-def {
+      background: rgba(56, 189, 248, 0.08);
+      border-left: 4px solid var(--primary);
+    }
+    .callout-warn {
+      background: rgba(245, 158, 11, 0.08);
+      border-left: 4px solid var(--accent);
+    }
+    .callout-danger {
+      background: rgba(239, 68, 68, 0.12);
+      border-left: 4px solid var(--danger);
+    }
+    .callout-success {
+      background: rgba(16, 185, 129, 0.08);
+      border-left: 4px solid var(--success);
+    }
+    .callout-header {
+      font-weight: 700;
+      font-size: 0.92rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .callout-def .callout-header { color: var(--primary); }
+    .callout-warn .callout-header { color: var(--accent); }
+    .callout-danger .callout-header { color: var(--danger); }
+    .callout-success .callout-header { color: var(--success); }
+
+    /* Fórmulas e Diagramas */
+    .math-block {
+      background: var(--card-subtle);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.4rem;
+      margin: 1.2rem 0;
+      overflow-x: auto;
+      text-align: center;
+    }
+
+    /* Grids e Mini-cards */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.2rem;
+      margin: 1.2rem 0;
+    }
+    .mini-card {
+      background: var(--card-subtle);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1.2rem;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .mini-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+    .mini-card h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* Tabelas Técnicas */
+    .table-container {
+      overflow-x: auto;
+      margin: 1.2rem 0;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      background: var(--table-header);
+      padding: 0.8rem 1rem;
+      font-weight: 700;
+      color: var(--text);
+      border-bottom: 2px solid var(--card-border);
+    }
+    td {
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    tr:nth-child(even) {
+      background: var(--table-stripe);
+    }
+    .badge-pin {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .badge-primary { background: var(--primary-glow); color: var(--primary); border: 1px solid var(--primary); }
+    .badge-accent { background: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-danger { background: var(--danger-glow); color: var(--danger); border: 1px solid var(--danger); }
+    .badge-success { background: var(--success-glow); color: var(--success); border: 1px solid var(--success); }
+    .badge-neutral { background: rgba(148, 163, 184, 0.1); color: var(--text-muted); border: 1px solid var(--card-border); }
+
+    /* Diagrama Visual Esquemático do Conector OBD-II */
+    .obd-diagram-container {
+      background: var(--card-subtle);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+    .obd-shell {
+      display: inline-block;
+      border: 2px solid var(--primary);
+      border-radius: 8px 8px 18px 18px;
+      padding: 1.2rem 1.6rem;
+      background: rgba(15, 23, 42, 0.8);
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
+      max-width: 100%;
+    }
+    .pin-row {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 0.8rem;
+    }
+    .pin-row:last-child {
+      margin-bottom: 0;
+    }
+    .pin-node {
+      width: 44px;
+      height: 48px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      transition: all 0.2s ease;
+      background: var(--card-bg);
+    }
+    .pin-node .num {
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .pin-node .name {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+    }
+    .pin-node.active-can {
+      border-color: var(--primary);
+      background: var(--primary-glow);
+      color: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+    .pin-node.active-gnd {
+      border-color: var(--success);
+      background: var(--success-glow);
+      color: var(--success);
+    }
+    .pin-node.danger-12v {
+      border-color: var(--danger);
+      background: var(--danger-glow);
+      color: var(--danger);
+      animation: pulseDanger 2s infinite ease-in-out;
+    }
+    @keyframes pulseDanger {
+      0%, 100% { box-shadow: 0 0 4px var(--danger-glow); }
+      50% { box-shadow: 0 0 12px var(--danger); }
+    }
+
+    /* Diagrama de Fiação Ponto a Ponto */
+    .wiring-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin: 1.5rem 0;
+    }
+    .wire-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--card-subtle);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 0.8rem 1.2rem;
+    }
+    .wire-source {
+      flex: 1;
+      font-weight: 700;
+    }
+    .wire-cable {
+      flex: 1.5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .wire-line {
+      height: 4px;
+      width: 100%;
+      border-radius: 2px;
+    }
+    .line-canh { background: #38bdf8; }
+    .line-canl { background: #818cf8; }
+    .line-gnd { background: #10b981; }
+    .line-danger { background: repeating-linear-gradient(45deg, #ef4444, #ef4444 6px, #000 6px, #000 12px); }
+    .wire-cable span {
+      position: absolute;
+      top: -18px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      background: var(--card-subtle);
+      padding: 0 0.3rem;
+    }
+    .wire-dest {
+      flex: 1;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    /* Rodapé */
+    .footer-nav {
+      border-top: 1px solid var(--card-border);
+      padding: 2.5rem 0;
+      margin-top: 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- BARRA SUPERIOR RETRÁTIL & NAVEGAÇÃO -->
+    <header class="top-controls">
+      <div class="nav-breadcrumbs">
+        <a href="../../Quadro_Geral_HTML.html">Quadro Geral</a>
+        <span>/</span>
+        <a href="Escopo%20do%20Projeto.txt">Projeto Fiesta Rocam 1.0</a>
+        <span>/</span>
+        <span style="color: var(--text);">Manual de Pinagem &amp; Chicote</span>
+      </div>
+      <div class="right-tools">
+        <select class="theme-select" id="themeSelector" title="Alternar tema visual" onchange="changeTheme(this.value)">
+          <option value="dark">Escuro (Dark)</option>
+          <option value="light">Claro (Light)</option>
+          <option value="campbell">Campbell (Terminal)</option>
+          <option value="monokai">Monokai Pro</option>
+          <option value="cyberpunk">Cyberpunk Neon</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- BANNER HERO -->
+    <div class="hero-banner">
+      <div class="module-tag">Engenharia Automotiva &amp; Telemetria CAN</div>
+      <h1>Manual de Pinagem do Chicote OBD-II &amp; LC_CANABLE_V2.1</h1>
+      <p>
+        Guia prático e fundamentação elétrica para confecção, soldagem e ligação do chicote entre o conector diagnóstico SAE J1962 de 16 pinos do <strong>Ford Fiesta 2010 1.0 Zetec Rocam</strong> e a interface transceptora <strong>LC_CANABLE_V2.1 (STM32G431)</strong>.
+      </p>
+      <div class="hero-actions">
+        <a href="static/index.html" class="btn-action">
+          <span>Abrir Cockpit Digital</span>
+          <span style="font-size: 1.1rem;">&rarr;</span>
+        </a>
+        <a href="Escopo%20do%20Projeto.txt" class="btn-action secondary">
+          <span>Diário de Bordo (TXT)</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- SUMÁRIO RETRÁTIL -->
+    <details class="summary-drawer" id="summaryDrawer">
+      <summary>Sumário Técnico do Manual</summary>
+      <div class="drawer-content">
+        <a href="#arquitetura" class="drawer-item" onclick="closeDrawer()">
+          <span class="num">01.</span>
+          <span>Arquitetura da Rede Ford EEC-VI</span>
+        </a>
+        <a href="#conector" class="drawer-item" onclick="closeDrawer()">
+          <span class="num">02.</span>
+          <span>Pinagem do Conector SAE J1962 (OBD-II)</span>
+        </a>
+        <a href="#ligacao" class="drawer-item" onclick="closeDrawer()">
+          <span class="num">03.</span>
+          <span>Esquema Ponto a Ponto (OBD-II &rarr; CANable)</span>
+        </a>
+        <a href="#alerta-12v" class="drawer-item" onclick="closeDrawer()">
+          <span class="num">04.</span>
+          <span>Perigo Crítico: Isolamento do Pino 16 (+12V)</span>
+        </a>
+        <a href="#terminacao" class="drawer-item" onclick="closeDrawer()">
+          <span class="num">05.</span>
+          <span>Resistor de Terminação 120 &Omega; (Jumper)</span>
+        </a>
+        <a href="#confeccao" class="drawer-item" onclick="closeDrawer()">
+          <span class="num">06.</span>
+          <span>Passo a Passo de Soldagem &amp; Par Trançado</span>
+        </a>
+        <a href="#teste-multimetro" class="drawer-item" onclick="closeDrawer()">
+          <span class="num">07.</span>
+          <span>Validação com Multímetro &amp; Bancada</span>
+        </a>
+      </div>
+    </details>
+
+    <!-- SEÇÃO 1: ARQUITETURA ELÉTRICA DA REDE DO FIESTA -->
+    <section class="section-card" id="arquitetura">
+      <div class="section-title">
+        <span class="section-num">01</span>
+        <span>Arquitetura da Rede Ford EEC-VI (High-Speed CAN)</span>
+      </div>
+      <p>
+        O Ford Fiesta 2010 Sedan 1.0 Zetec Rocam utiliza o sistema de gerenciamento eletrônico <strong>Ford EEC-VI</strong>. A comunicação primária de dados e telemetria entre o Módulo de Controle do Trem de Força (PCM / ECU), o Painel de Instrumentos (IPC) e o conector de diagnóstico é realizada por um barramento diferencial <strong>High-Speed CAN (ISO 11898 / ISO 15765-4)</strong>.
+      </p>
+
+      <div class="card-grid">
+        <div class="mini-card">
+          <h4>Velocidade da Linha</h4>
+          <p style="font-size: 0.95rem; margin-bottom: 0;">
+            <strong>500 kbps</strong> (High-Speed CAN). É a velocidade configurada na interface via comando SLCAN <code>S6</code>.
+          </p>
+        </div>
+        <div class="mini-card">
+          <h4>Protocolo de Diagnóstico</h4>
+          <p style="font-size: 0.95rem; margin-bottom: 0;">
+            <strong>ISO 15765-4 (CAN 11-bit ID / 500k)</strong>. PIDs padrão SAE J1979 consultados no endereço funcional <code>0x7DF</code>.
+          </p>
+        </div>
+        <div class="mini-card">
+          <h4>Níveis de Tensão Diferencial</h4>
+          <p style="font-size: 0.95rem; margin-bottom: 0;">
+            Recessivo: <strong>2,5 V</strong> em ambas as linhas.<br>
+            Dominante: <strong>CAN_H &approx; 3,5 V</strong> e <strong>CAN_L &approx; 1,5 V</strong> ($\Delta V \approx 2,0\text{ V}$).
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEÇÃO 2: PINAGEM COMPLETA DO CONECTOR OBD-II -->
+    <section class="section-card" id="conector">
+      <div class="section-title">
+        <span class="section-num">02</span>
+        <span>Pinagem do Conector Diagnóstico SAE J1962 (OBD-II)</span>
+      </div>
+      <p>
+        O conector fêmea do carro está localizado no habitáculo interno, abaixo da coluna de direção (lado esquerdo do motorista). Abaixo está o diagrama frontal de pinagem do conector <strong>macho</strong> (visto de frente para os pinos que serão soldados no chicote):
+      </p>
+
+      <!-- DIAGRAMA VISUAL ESQUEMÁTICO -->
+      <div class="obd-diagram-container">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.8rem; letter-spacing: 0.05em;">
+          Vista Frontal dos Pinos (Lado do Chicote Macho / Solda)
+        </div>
+        <div class="obd-shell">
+          <!-- Fileira Superior: Pinos 1 a 8 -->
+          <div class="pin-row">
+            <div class="pin-node"><span class="num">1</span><span class="name">NC</span></div>
+            <div class="pin-node"><span class="num">2</span><span class="name">PWM</span></div>
+            <div class="pin-node"><span class="num">3</span><span class="name">MS+</span></div>
+            <div class="pin-node active-gnd" title="GND de Chassi (Massa)"><span class="num">4</span><span class="name">GND</span></div>
+            <div class="pin-node active-gnd" title="GND de Sinal"><span class="num">5</span><span class="name">SGND</span></div>
+            <div class="pin-node active-can" title="CAN High (500 kbps)"><span class="num">6</span><span class="name">CAN_H</span></div>
+            <div class="pin-node"><span class="num">7</span><span class="name">K-LINE</span></div>
+            <div class="pin-node"><span class="num">8</span><span class="name">NC</span></div>
+          </div>
+          <!-- Fileira Inferior: Pinos 9 a 16 -->
+          <div class="pin-row">
+            <div class="pin-node"><span class="num">9</span><span class="name">NC</span></div>
+            <div class="pin-node"><span class="num">10</span><span class="name">PWM-</span></div>
+            <div class="pin-node"><span class="num">11</span><span class="name">MS-</span></div>
+            <div class="pin-node"><span class="num">12</span><span class="name">NC</span></div>
+            <div class="pin-node"><span class="num">13</span><span class="name">NC</span></div>
+            <div class="pin-node active-can" title="CAN Low (500 kbps)"><span class="num">14</span><span class="name">CAN_L</span></div>
+            <div class="pin-node"><span class="num">15</span><span class="name">L-LINE</span></div>
+            <div class="pin-node danger-12v" title="PERIGO: +12V Bateria Permanente - NÃO CONECTAR"><span class="num">16</span><span class="name">+12V</span></div>
+          </div>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.8rem;">
+          Azul = CAN Differential (Ativos) | Verde = Terra GND (Ativo) | Vermelho = +12V Direto da Bateria (ISOLAR)
+        </div>
+      </div>
+
+      <!-- TABELA TÉCNICA DE DISCRIMINAÇÃO DOS PINOS -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 80px;">Pino</th>
+              <th>Nome / Sinal Padrão</th>
+              <th>Função no Ford Fiesta Rocam</th>
+              <th>Destino no LC_CANABLE</th>
+              <th>Status no Chicote</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge-pin badge-neutral">4</span></td>
+              <td>Chassis Ground</td>
+              <td>Terra estrutural do chassi do veículo</td>
+              <td><strong>GND</strong></td>
+              <td><span class="badge-pin badge-success">Conectar (GND)</span></td>
+            </tr>
+            <tr>
+              <td><span class="badge-pin badge-neutral">5</span></td>
+              <td>Signal Ground</td>
+              <td>Terra de referência dos sinais eletrônicos</td>
+              <td><strong>GND</strong> (Alternativa ao pino 4)</td>
+              <td><span class="badge-pin badge-success">Conectar (GND)</span></td>
+            </tr>
+            <tr>
+              <td><span class="badge-pin badge-primary">6</span></td>
+              <td>CAN High (ISO 15765-4)</td>
+              <td>Barramento CAN Alta Velocidade (+)</td>
+              <td><strong>CAN_H</strong></td>
+              <td><span class="badge-pin badge-primary">Obrigatório (CAN_H)</span></td>
+            </tr>
+            <tr>
+              <td><span class="badge-pin badge-primary">14</span></td>
+              <td>CAN Low (ISO 15765-4)</td>
+              <td>Barramento CAN Alta Velocidade (-)</td>
+              <td><strong>CAN_L</strong></td>
+              <td><span class="badge-pin badge-primary">Obrigatório (CAN_L)</span></td>
+            </tr>
+            <tr style="background: rgba(239, 68, 68, 0.08);">
+              <td><span class="badge-pin badge-danger">16</span></td>
+              <td>Battery Power (+12V)</td>
+              <td>Alimentação constante (+12V da bateria via fusível)</td>
+              <td><strong>NENHUM (ISOLAR)</strong></td>
+              <td><span class="badge-pin badge-danger">PROIBIDO CONECTAR</span></td>
+            </tr>
+            <tr>
+              <td><span class="badge-pin badge-neutral">Outros</span></td>
+              <td>Pinos 1, 2, 3, 7, 8, 9, 10, 11, 12, 13, 15</td>
+              <td>PWM, K-Line ou não conectados no Fiesta Rocam</td>
+              <td>Nenhum</td>
+              <td><span class="badge-pin badge-neutral">Deixar Desconectado</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO 3: LIGAÇÃO PONTO A PONTO -->
+    <section class="section-card" id="ligacao">
+      <div class="section-title">
+        <span class="section-num">03</span>
+        <span>Esquema de Ligação Ponto a Ponto (Chicote Final)</span>
+      </div>
+      <p>
+        Para que a telemetria funcione com 100% de estabilidade e imunidade a ruídos, são necessários <strong>apenas 3 fios</strong> entre o conector OBD-II e a borneira da placa CANable.
+      </p>
+
+      <!-- FLUXOGRAMA DE LIGAÇÃO -->
+      <div class="wiring-flow">
+        <div class="wire-row">
+          <div class="wire-source"><span class="badge-pin badge-primary">Pino 6</span> OBD-II (CAN_H)</div>
+          <div class="wire-cable">
+            <div class="wire-line line-canh"></div>
+            <span>Fio Trançado Azul/Branco</span>
+          </div>
+          <div class="wire-dest">Terminal <strong>CAN_H</strong> (CANable) <span class="badge-pin badge-primary">CAN_H</span></div>
+        </div>
+
+        <div class="wire-row">
+          <div class="wire-source"><span class="badge-pin badge-primary">Pino 14</span> OBD-II (CAN_L)</div>
+          <div class="wire-cable">
+            <div class="wire-line line-canl"></div>
+            <span>Fio Trançado Azul</span>
+          </div>
+          <div class="wire-dest">Terminal <strong>CAN_L</strong> (CANable) <span class="badge-pin badge-primary">CAN_L</span></div>
+        </div>
+
+        <div class="wire-row">
+          <div class="wire-source"><span class="badge-pin badge-success">Pino 4 ou 5</span> OBD-II (GND)</div>
+          <div class="wire-cable">
+            <div class="wire-line line-gnd"></div>
+            <span>Fio Preto (Malha/Terra)</span>
+          </div>
+          <div class="wire-dest">Terminal <strong>GND</strong> (CANable) <span class="badge-pin badge-success">GND</span></div>
+        </div>
+
+        <div class="wire-row" style="border-color: var(--danger);">
+          <div class="wire-source" style="color: var(--danger);"><span class="badge-pin badge-danger">Pino 16</span> OBD-II (+12V)</div>
+          <div class="wire-cable">
+            <div class="wire-line line-danger"></div>
+            <span style="color: var(--danger); font-weight: 700;">CORTE / ISOLAMENTO</span>
+          </div>
+          <div class="wire-dest" style="color: var(--danger);">NÃO LIGAR EM NENHUM PINO &times;</div>
+        </div>
+      </div>
+
+      <div class="callout callout-def">
+        <div class="callout-header">Por que ligar o GND se o sinal CAN é diferencial?</div>
+        <p style="margin-bottom: 0;">
+          Apesar do transceptor CAN medir a diferença de tensão $(\Delta V = V_{CAN\_H} - V_{CAN\_L})$, ele possui limites estritos de <strong>tensão em modo comum</strong> (tipicamente de $-7\text{ V}$ a $+12\text{ V}$). Sem o fio de terra unindo o chassi do carro ao GND do CANable, o potencial elétrico do notebook/tablet pode flutuar, provocando perda de sincronismo de pacotes e corrupção de mensagens.
+        </p>
+      </div>
+    </section>
+
+    <!-- SEÇÃO 4: PERIGO CRÍTICO DO PINO 16 (+12V) -->
+    <section class="section-card" id="alerta-12v" style="border-color: var(--danger);">
+      <div class="section-title" style="border-bottom-color: var(--danger-glow);">
+        <span class="section-num" style="background: var(--danger-glow); color: var(--danger); border-color: var(--danger);">04</span>
+        <span style="color: var(--danger);">Alerta Crítico: Isolamento Obrigatório do Pino 16 (+12V)</span>
+      </div>
+
+      <div class="callout callout-danger" style="margin-top: 0;">
+        <div class="callout-header" style="font-size: 1.05rem;">
+          Risco Imediato de Destruição do Hardware (CANable &amp; Porta USB)
+        </div>
+        <p>
+          O <strong>Pino 16</strong> do conector OBD-II recebe tensão direta de <strong>+12 V (até 14,4 V com alternador carregando)</strong> da bateria do carro, mesmo com a chave desligada.
+        </p>
+        <p style="margin-bottom: 0;">
+          A placa <strong>LC_CANABLE_V2.1 (STM32G431)</strong> é alimentada <strong>exclusivamente pelos 5 V da porta USB</strong> do computador, tablet ou TV Box. Ela <strong>NÃO</strong> possui regulador de tensão step-down integrado para 12 V.
+        </p>
+      </div>
+
+      <div class="card-grid">
+        <div class="mini-card" style="border-color: var(--danger);">
+          <h4 style="color: var(--danger);">O que acontece se ligar o Pino 16?</h4>
+          <p style="font-size: 0.9rem;">
+            Se o pino 16 for soldado acidentalmente no borne de alimentação ou em qualquer pino do microcontrolador STM32G431, a tensão de 12 V queimará instantaneamente o MCU e o transceptor CAN, podendo retornar 12 V pela linha VBUS da USB e <strong>queimar a placa-mãe do PC, Tablet ou TV Box</strong>.
+          </p>
+        </div>
+        <div class="mini-card" style="border-color: var(--success);">
+          <h4 style="color: var(--success);">Regra de Ouro da Montagem</h4>
+          <p style="font-size: 0.9rem;">
+            No conector macho OBD-II de 16 pinos que você vai soldar: <strong>corte a perna do terminal 16 ou aplique fita isolante / espaguete termorretátil</strong> para garantir que nenhum filamento de solda encoste nele.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEÇÃO 5: RESISTOR DE TERMINAÇÃO DE 120 OHMS -->
+    <section class="section-card" id="terminacao">
+      <div class="section-title">
+        <span class="section-num">05</span>
+        <span>A Questão do Resistor de Terminação (120 &Omega;)</span>
+      </div>
+      <p>
+        A especificação ISO 11898 determina que uma linha CAN High Speed deve possuir exatamente <strong>dois resistores de terminação de $120\,\Omega$</strong>, localizados nas duas extremidades físicas do barramento, para evitar reflexões de ondas de alta frequência.
+      </p>
+
+      <div class="math-block">
+        $$R_{equivalente} = \frac{R_1 \times R_2}{R_1 + R_2} = \frac{120 \times 120}{120 + 120} = 60\,\Omega$$
+      </div>
+
+      <p>
+        No Ford Fiesta 2010, os dois resistores originais de $120\,\Omega$ <strong>já estão instalados de fábrica dentro do veículo</strong>: um fica dentro do módulo de injeção (PCM) e o outro fica dentro do painel de instrumentos (IPC).
+      </p>
+
+      <div class="callout callout-warn">
+        <div class="callout-header">Posição do Jumper / Chave Seletora na Placa CANable</div>
+        <p>
+          A placa LC_CANABLE_V2.1 possui um jumper de terminação (geralmente marcado como <strong>120R</strong> ou <strong>TERM</strong>).
+        </p>
+        <p style="font-weight: 700; margin-bottom: 0;">
+          Para uso no carro: O JUMPER DEVE FICAR ABERTO / DESLIGADO (OFF).
+        </p>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Cenário Operacional</th>
+              <th>Jumper 120R no CANable</th>
+              <th>Resistência Resultante na Linha</th>
+              <th>Efeito no Barramento do Fiesta</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: rgba(16, 185, 129, 0.08);">
+              <td><strong>Conectado ao Carro (Correto)</strong></td>
+              <td><strong>ABERTO / OFF</strong></td>
+              <td>$\approx 60\,\Omega$ (Terminação Original)</td>
+              <td>Sinal perfeito, sem reflexões, sem erros de frame.</td>
+            </tr>
+            <tr style="background: rgba(239, 68, 68, 0.08);">
+              <td><strong>Conectado ao Carro (Errado)</strong></td>
+              <td>FECHADO / ON</td>
+              <td>$\approx 40\,\Omega$ (3 resistores de 120)</td>
+              <td>Queda excessiva de corrente, distorção de níveis e erro Bus Heavy.</td>
+            </tr>
+            <tr>
+              <td><strong>Teste de Bancada (Mesa sem carro)</strong></td>
+              <td>FECHADO / ON</td>
+              <td>$120\,\Omega$ (Carga de bancada)</td>
+              <td>Permite loopback e testes simulados entre nós de teste.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO 6: PASSO A PASSO DE MONTAGEM E SOLDA -->
+    <section class="section-card" id="confeccao">
+      <div class="section-title">
+        <span class="section-num">06</span>
+        <span>Passo a Passo Prático de Soldagem &amp; Par Trançado</span>
+      </div>
+
+      <p>Siga rigorosamente as etapas de montagem física do chicote:</p>
+
+      <ol>
+        <li>
+          <strong>Escolha dos Cabos (Uso de Par Trançado):</strong><br>
+          Para os pinos <strong>6 (CAN_H)</strong> e <strong>14 (CAN_L)</strong>, utilize impreterivelmente um par trançado (fios trançados entre si a cada 2 a 3 cm, como um par extraído de cabo de rede de alta qualidade UTP Cat5e/Cat6 ou fios automotivos 0,35 mm&sup2; a 0,50 mm&sup2;). A trança cancela o ruído induzido pela bobina de ignição e alternador do Zetec Rocam.
+        </li>
+        <li>
+          <strong>Identificação Visual da Pinagem:</strong><br>
+          Observe os números gravados em alto relevo no plástico do conector macho OBD-II (1 a 8 na fileira superior larga, 9 a 16 na fileira inferior estreita).
+        </li>
+        <li>
+          <strong>Estanhagem Prévia dos Terminais:</strong><br>
+          Aplique fluxo de solda e estanhe previamente apenas as cavidades dos pinos <strong>4 (ou 5)</strong>, <strong>6</strong> e <strong>14</strong>. Não aqueça em excesso para não amolecer a carcaça de plástico do conector.
+        </li>
+        <li>
+          <strong>Soldagem e Isolamento com Termorretátil:</strong><br>
+          Coloque previamente pedaços de espaguete termorretátil de 1,5 mm em cada fio. Solde os fios nos terminais correspondentes e encolha o termorretátil cobrindo 100% do cobre exposto.
+        </li>
+        <li>
+          <strong>Corte Físico de Segurança do Terminal 16:</strong><br>
+          Corte a haste interna do pino 16 ou preencha-a com cola quente/resina isolante para evitar qualquer contato involuntário.
+        </li>
+        <li>
+          <strong>Fixação Mecânica (Alívio de Tensão):</strong><br>
+          Utilize uma abraçadeira plástica (enforca-gato) prendendo os cabos à carcaça do conector OBD-II. Isso impede que puxões no cabo rompam as soldas frágeis dos pinos.
+        </li>
+      </ol>
+    </section>
+
+    <!-- SEÇÃO 7: VALIDAÇÃO COM MULTÍMETRO & BANCADA -->
+    <section class="section-card" id="teste-multimetro">
+      <div class="section-title">
+        <span class="section-num">07</span>
+        <span>Procedimento de Validação em Bancada Antes do Carro</span>
+      </div>
+
+      <p>
+        Nunca conecte um chicote recém-confeccionado diretamente no conector do carro sem antes realizar os testes de continuidade a frio:
+      </p>
+
+      <div class="card-grid">
+        <div class="mini-card">
+          <h4>1. Teste de Curto-Circuito (Bip)</h4>
+          <p style="font-size: 0.9rem;">
+            Com o chicote desconectado de tudo, coloque o multímetro na escala de continuidade:<br>
+            • Entre CAN_H e CAN_L: <strong>NÃO pode bipar</strong> (circuito aberto).<br>
+            • Entre CAN_H e GND: <strong>NÃO pode bipar</strong>.<br>
+            • Entre Pino 16 e qualquer outro: <strong>NÃO pode bipar</strong>.
+          </p>
+        </div>
+        <div class="mini-card">
+          <h4>2. Teste de Resistência no Carro</h4>
+          <p style="font-size: 0.9rem;">
+            Com o carro com a <strong>chave desligada</strong>, meça com o multímetro entre o pino 6 e o pino 14 do conector fêmea do Fiesta:<br>
+            • A resistência deve marcar entre <strong>$58\,\Omega$ e $62\,\Omega$</strong>.<br>
+            Isso confirma que os dois resistores originais do carro estão íntegros.
+          </p>
+        </div>
+        <div class="mini-card">
+          <h4>3. Teste de Bancada com o Script</h4>
+          <p style="font-size: 0.9rem;">
+            Antes de plugar no Fiesta, espete o CANable na porta USB e execute o launcher:<br>
+            <code>Projetos/Projeto Fiesta Zetec Rocam 1.0/testar_bancada.bat</code><br>
+            Ele validará a taxa de 500k e o handshake SLCAN sem risco algum.
+          </p>
+        </div>
+      </div>
+
+      <div class="callout callout-success">
+        <div class="callout-header">Pronto para a Primeira Conexão no Veículo</div>
+        <p style="margin-bottom: 0;">
+          Após passar nos testes 1, 2 e 3: com a chave do Fiesta desligada, plugue o chicote no conector OBD-II, ligue a USB no computador e rode o <code>iniciar_painel.bat</code>. Gire a chave para o primeiro estágio (sem dar partida) para alimentar a ECU e observe os sensores de Tensão e Temperatura no Cockpit Digital.
+        </p>
+      </div>
+    </section>
+
+    <!-- RODAPÉ TÉCNICO -->
+    <footer class="footer-nav">
+      <div>
+        <strong>Ford Fiesta 2010 Sedan 1.0 Zetec Rocam</strong> | Cluster Digital &amp; Telemetria
+      </div>
+      <div>
+        David Peixoto Ramos &bull; UFF Engenharia Mecânica 2026.2
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    // Gerenciador de Temas do Workspace com persistência em localStorage
+    function changeTheme(themeName) {
+      document.documentElement.setAttribute('data-theme', themeName);
+      localStorage.setItem('html_fiesta_theme', themeName);
+      const selector = document.getElementById('themeSelector');
+      if (selector) selector.value = themeName;
+    }
+
+    // Restaurar preferência ao carregar a página
+    (function initTheme() {
+      const savedTheme = localStorage.getItem('html_fiesta_theme') || 'dark';
+      changeTheme(savedTheme);
+    })();
+
+    // Recolhimento automático do sumário retrátil ao clicar em âncoras
+    function closeDrawer() {
+      const drawer = document.getElementById('summaryDrawer');
+      if (drawer && drawer.hasAttribute('open')) {
+        drawer.removeAttribute('open');
+      }
+    }
+  </script>
+</body>
+</html>

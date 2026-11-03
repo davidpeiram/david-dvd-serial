@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Anotações Pessoais e Rascunhos
+Consideracoes_David/
+
+# Logs e dados brutos gravados
+logs/*
+!logs/.gitkeep
+
+# IDE e Sistema
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini

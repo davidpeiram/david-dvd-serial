@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ford Fiesta Zetec Rocam - Painel Digital OBD-II</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=2.3">
+</head>
+<body>
+
+  <!-- Top Bar / Status do Sistema -->
+  <header class="top-bar">
+    <div class="brand-section">
+      <span class="brand-badge">FORD</span>
+      <span class="car-title">Fiesta Sedan 1.0 Zetec Rocam</span>
+    </div>
+
+    <!-- Relógio Digital Central -->
+    <div id="live-clock" class="top-center-clock">--:--:--</div>
+
+    <!-- Status da Rede CAN, Injeção e Botão Tela Cheia -->
+    <div class="status-section">
+      <div id="conn-info-badge" class="connection-badge">CANABLE 500K</div>
+      <div id="mil-badge" class="mil-badge mil-ok" title="Diagnóstico da Injeção Eletrônica (MIL / DTCs)">
+        <span id="mil-icon">✅</span>
+        <span id="mil-text">INJEÇÃO OK</span>
+      </div>
+
+      <button id="btn-fullscreen" class="btn-fullscreen" title="Modo Tela Cheia (F11)">⛶ Tela Cheia</button>
+      <div class="status-pill">
+        <div id="status-dot" class="status-dot"></div>
+        <span id="status-text">CONECTANDO...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container do Painel de Instrumentos -->
+  <main class="cluster-container">
+
+    <!-- Cockpit Principal: Tacômetro, Marcha, Consumo e Velocímetro -->
+    <section class="main-cluster">
+      
+      <!-- Mostrador Esquerdo: Tacômetro (RPM) -->
+      <div class="gauge-box">
+        <canvas id="gauge-rpm-canvas" class="gauge-canvas" width="360" height="360"></canvas>
+        <div class="gauge-center-text">
+          <div id="val-rpm" class="gauge-val">0</div>
+          <div class="gauge-unit">RPM <span class="tag-meta tag-real">REAL</span></div>
+        </div>
+      </div>
+
+      <!-- Centro: Visor de Marcha + Consumo + Trip -->
+      <div class="center-infocenter">
+        <!-- Indicador de Marcha (Calculada pelo câmbio IB5) -->
+        <div class="gear-display-box">
+          <div class="gear-header-wrap">
+            <span class="gear-label">MARCHA</span>
+            <span class="tag-meta tag-est">ESTIMADO</span>
+          </div>
+          <div id="val-gear" class="gear-number">N</div>
+          <span class="gear-subtext">CÂMBIO IB5</span>
+        </div>
+
+        <!-- Consumo Instantâneo em Destaque -->
+        <div class="consumption-hero-box">
+          <div class="hero-header-wrap">
+            <span class="hero-label">Consumo Instantâneo</span>
+            <span class="tag-meta tag-est">ESTIMADO</span>
+          </div>
+          <div class="hero-value-wrap">
+            <span id="val-consumption" class="hero-value">--</span>
+            <span id="unit-consumption" class="hero-unit">km/L</span>
+          </div>
+        </div>
+
+        <!-- Mini Computador de Bordo (Trip) -->
+        <div class="trip-summary-bar">
+          <div class="trip-chip">
+            <div class="trip-chip-label">Distância Trip <span class="chip-meta tag-real">REAL</span></div>
+            <div id="val-trip-km" class="trip-chip-val">0.0 km</div>
+          </div>
+          <div class="trip-chip">
+            <div class="trip-chip-label">Tempo Viagem <span class="chip-meta tag-real">REAL</span></div>
+            <div id="val-trip-time" class="trip-chip-val">00:00:00</div>
+          </div>
+        </div>
+
+        <!-- Linha 2: Combustível Gasto, Custo Estimado e Média -->
+        <div class="trip-summary-sub">
+          <div class="trip-chip" title="Total de combustível consumido nesta viagem">
+            <div class="trip-chip-label">Gasto Viagem <span class="chip-meta tag-est">EST</span></div>
+            <div id="val-trip-fuel" class="trip-chip-val" style="color: #00e676;">0.00 L</div>
+          </div>
+          <div class="trip-chip" title="Custo estimado em Reais (configurável em config.json)">
+            <div class="trip-chip-label">Custo Est. <span class="chip-meta tag-est">EST</span></div>
+            <div id="val-trip-cost" class="trip-chip-val" style="color: #00d2ff;">R$ 0,00</div>
+          </div>
+          <div class="trip-chip" title="Média de consumo da viagem">
+            <div class="trip-chip-label">Média Trip <span class="chip-meta tag-est">EST</span></div>
+            <div id="val-trip-avg" class="trip-chip-val">0.0 km/L</div>
+          </div>
+        </div>
+
+        <!-- Barra de Ações: Gravação de Log e Reset -->
+        <div class="trip-actions-bar">
+          <button id="btn-toggle-log" class="btn-trip btn-record" title="Gravar telemetria contínua da viagem em arquivo CSV">
+            <span id="log-dot" class="rec-dot"></span>
+            <span id="btn-log-text">GRAVAR LOG</span>
+          </button>
+          <button id="btn-reset-trip" class="btn-trip" title="Zerar odômetro parcial e litros gastos para uma nova viagem">
+            🔄 ZERAR
+          </button>
+          <button id="btn-open-logs" class="btn-trip" title="Ver histórico de viagens gravadas">
+            📂 LOGS
+          </button>
+        </div>
+      </div>
+
+      <!-- Mostrador Direito: Velocímetro (km/h) -->
+      <div class="gauge-box">
+        <canvas id="gauge-speed-canvas" class="gauge-canvas" width="360" height="360"></canvas>
+        <div class="gauge-center-text">
+          <div id="val-speed" class="gauge-val">0</div>
+          <div class="gauge-unit">KM/H <span class="tag-meta tag-real">REAL</span></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Grade de Telemetria Automotiva dos Sensores (Estilo Argon Cockpit) -->
+    <section class="sensors-grid">
+      
+      <!-- Sensor 1: Temperatura da Água do Motor -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Temp. Motor</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">🌡️</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-coolant" class="card-num">--</span>
+          <span class="card-unit">°C</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-coolant" class="progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Sensor 2: Tensão da Bateria (Estimada) -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Tensão Bateria</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-est">ESTIMADO</span>
+            <span class="card-icon">⚡</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-battery" class="card-num">--</span>
+          <span class="card-unit">V</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-battery" class="progress-fill"></div>
+        </div>
+        <div class="card-sub" style="color: #ffb300;">Aprox. por RPM • Sem ADC Físico</div>
+      </div>
+
+      <!-- Sensor 3: Pressão MAP (Carga do Motor) -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Pressão MAP</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">💨</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-map" class="card-num">--</span>
+          <span class="card-unit">kPa</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-map" class="progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Sensor 4: Posição da Borboleta (TPS) -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Borboleta (TPS)</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">🎯</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-throttle" class="card-num">--</span>
+          <span class="card-unit">%</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-throttle" class="progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Sensor 5: Nível Real do Tanque de Combustível (ID 0x430) -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Combustível Real</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">⛽</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-fuel" class="card-num">--</span>
+          <span class="card-unit">%</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-fuel" class="progress-fill"></div>
+        </div>
+        <div id="val-fuel-sub" class="card-sub">-- L / 54L • Auton: -- km (Est.)</div>
+      </div>
+
+      <!-- Sensor 6: Carga Calculada do Motor (Load) -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Carga do Motor</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">📈</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-load" class="card-num">--</span>
+          <span class="card-unit">%</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-load" class="progress-fill"></div>
+        </div>
+        <div class="card-sub">Esforço Volumétrico (ECU)</div>
+      </div>
+
+      <!-- Sensor 7: Ponto de Ignição / Avanço (Timing Advance) -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Ponto Ignição</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">⚡</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-timing" class="card-num">--</span>
+          <span class="card-unit">° APMS</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-timing" class="progress-fill"></div>
+        </div>
+        <div class="card-sub">Avanço da Centelha (ECU)</div>
+      </div>
+
+      <!-- Sensor 8: Sonda Lambda & Ajustes de Combustível (STFT/LTFT) -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Sonda Lambda</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">🧬</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-trim-status" class="card-num" style="font-size: 20px;">--</span>
+          <span class="card-unit">A/F</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-trim" class="progress-fill"></div>
+        </div>
+        <div id="val-trim-sub" class="card-sub">STFT: --% • LTFT: --%</div>
+      </div>
+
+      <!-- Sensor 9: Torque Instantâneo do Motor (ID 0x422) -->
+      <div class="sensor-card">
+        <div class="card-top">
+          <span class="card-title">Torque Motor</span>
+          <div class="card-tags">
+            <span class="tag-meta tag-real">REAL</span>
+            <span class="card-icon">⚙️</span>
+          </div>
+        </div>
+        <div class="card-num-box">
+          <span id="val-torque" class="card-num">0</span>
+          <span class="card-unit">Nm</span>
+        </div>
+        <div class="progress-bg">
+          <div id="progress-torque" class="progress-fill" style="width: 0%;"></div>
+        </div>
+        <div id="val-torque-sub" class="card-sub">Máx Rocam: 93 Nm (73 cv)</div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Modal de Resumo da Viagem (Ao finalizar o log) -->
+  <div id="modal-summary" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">🏁 Resumo da Viagem Concluída</span>
+        <button id="btn-close-summary" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="trip-stats-grid">
+        <div class="stat-item">
+          <div class="stat-label">Distância Percorrida</div>
+          <div id="summary-distance" class="stat-val">0.0 km</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Combustível Gasto</div>
+          <div id="summary-fuel" class="stat-val" style="color: #00e676;">0.00 L</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Custo Estimado</div>
+          <div id="summary-cost" class="stat-val" style="color: #00d2ff;">R$ 0,00</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Média da Viagem</div>
+          <div id="summary-avg-kml" class="stat-val">0.0 km/L</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Duração da Viagem</div>
+          <div id="summary-duration" class="stat-val">00:00:00</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Velocidade Média / Máx</div>
+          <div id="summary-speed" class="stat-val">0 / 0 km/h</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-download-current-log" class="btn-modal btn-modal-primary">📥 Baixar Arquivo CSV</button>
+        <button id="btn-dismiss-summary" class="btn-modal btn-modal-secondary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Gerenciamento de Logs Salvos -->
+  <div id="modal-logs-list" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">📂 Histórico de Viagens Gravadas</span>
+        <button id="btn-close-logs-list" class="modal-close-btn">&times;</button>
+      </div>
+      <div id="logs-container" style="max-height: 280px; overflow-y: auto; margin-bottom: 16px;">
+        <!-- Lista dinâmica gerada por JS -->
+      </div>
+      <div class="modal-actions">
+        <button id="btn-dismiss-logs-list" class="btn-modal btn-modal-secondary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/gauge.js?v=2.3"></script>
+  <script src="/static/js/app.js?v=2.3"></script>
+</body>
+</html>

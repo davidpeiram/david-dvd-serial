@@ -1,0 +1,759 @@
+:root {
+  --bg-primary: #080a10;
+  --bg-surface: #0f1420;
+  --bg-card: #141b29;
+  --accent-cyan: #00d2ff;
+  --accent-blue: #2575fc;
+  --accent-red: #ff3366;
+  --accent-orange: #ff9900;
+  --accent-green: #00e676;
+  --text-main: #f0f4f8;
+  --text-muted: #829ab1;
+  --border-color: #1f2a3f;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+/* Header & Status Bar */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 24px;
+  background-color: rgba(15, 20, 32, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 100;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-badge {
+  background: linear-gradient(135deg, #10419c, #0080ff);
+  color: #fff;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.car-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #d9e2ec;
+}
+
+.top-center-clock {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #bcccdc;
+  letter-spacing: 2px;
+}
+
+.status-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mil-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.mil-ok {
+  color: #00e676;
+  background-color: rgba(0, 230, 118, 0.12);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+}
+
+.ac-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.ac-on {
+  color: #00d2ff;
+  background-color: rgba(0, 210, 255, 0.15);
+  border: 1px solid rgba(0, 210, 255, 0.45);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.25);
+  animation: pulse-ac 2s infinite ease-in-out;
+}
+
+.ac-off {
+  color: #627d98;
+  background-color: rgba(98, 125, 152, 0.12);
+  border: 1px solid rgba(98, 125, 152, 0.25);
+}
+
+@keyframes pulse-ac {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+.mil-alert {
+  color: #ff9900;
+  background-color: rgba(255, 153, 0, 0.2);
+  border: 1px solid rgba(255, 153, 0, 0.6);
+  animation: pulse-mil 1.5s infinite;
+}
+
+@keyframes pulse-mil {
+  0% { box-shadow: 0 0 4px rgba(255, 153, 0, 0.4); }
+  50% { box-shadow: 0 0 14px rgba(255, 153, 0, 0.9); }
+  100% { box-shadow: 0 0 4px rgba(255, 153, 0, 0.4); }
+}
+
+.connection-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  background-color: rgba(0, 210, 255, 0.1);
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-fullscreen {
+  background-color: #1a2233;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-fullscreen:hover {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ff3366;
+  box-shadow: 0 0 8px #ff3366;
+  transition: all 0.3s ease;
+}
+
+.status-dot.online {
+  background-color: var(--accent-green);
+  box-shadow: 0 0 10px var(--accent-green);
+}
+
+.status-dot.waiting {
+  background-color: #ffb300;
+  box-shadow: 0 0 10px #ffb300;
+}
+
+.status-dot.demo {
+  background-color: #00d2ff;
+  box-shadow: 0 0 10px #00d2ff;
+}
+
+.status-dot.offline {
+  background-color: #ff3366;
+  box-shadow: 0 0 8px #ff3366;
+}
+
+.stale-indicator {
+  opacity: 0.45 !important;
+  transition: opacity 0.3s ease;
+}
+
+/* Container do Painel */
+.cluster-container {
+  flex: 1;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+/* Cockpit Principal (Instrument Cluster) */
+.main-cluster {
+  display: grid;
+  grid-template-columns: 1fr 280px 1fr;
+  align-items: center;
+  gap: 20px;
+  background: radial-gradient(ellipse at center, #131b2a 0%, #0b0f17 100%);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  position: relative;
+}
+
+.gauge-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.gauge-canvas {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+
+.gauge-center-text {
+  position: absolute;
+  top: 56%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.gauge-val {
+  font-family: 'Courier New', Courier, monospace, sans-serif;
+  font-size: 44px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -1px;
+}
+
+.gauge-unit {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+/* Centro do Painel: Marcha + Computador de Bordo */
+.center-infocenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  z-index: 10;
+}
+
+/* Display da Marcha Estilo Motorsport */
+.gear-display-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 28px;
+  background: radial-gradient(circle, #1a2436 0%, #0a0e16 100%);
+  border: 2px solid var(--accent-cyan);
+  border-radius: 18px;
+  box-shadow: 0 0 25px rgba(0, 210, 255, 0.3);
+  min-width: 130px;
+}
+
+.gear-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.gear-number {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 72px;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 0 20px rgba(0, 210, 255, 0.9);
+  line-height: 1;
+  margin: 2px 0;
+}
+
+.gear-subtext {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  letter-spacing: 1px;
+}
+
+/* Card Central de Consumo Instantâneo */
+.consumption-hero-box {
+  background-color: rgba(18, 24, 38, 0.85);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 10px 16px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.hero-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.hero-value-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.hero-value {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 28px;
+  font-weight: 800;
+  color: #00e676;
+}
+
+.hero-unit {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Trip Computer Bar */
+.trip-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.trip-summary-sub {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.trip-chip {
+  background-color: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 5px 6px;
+  text-align: center;
+}
+
+.trip-chip-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.trip-chip-val {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0f4f8;
+}
+
+/* Barra de Ações de Viagem & Gravação de Log */
+.trip-actions-bar {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.btn-trip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background-color: #161f30;
+  color: var(--text-main);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-trip:hover {
+  background-color: #1f2a3f;
+  border-color: var(--accent-cyan);
+}
+
+.btn-record {
+  background: linear-gradient(135deg, rgba(255, 51, 102, 0.12), rgba(255, 51, 102, 0.04));
+  border-color: rgba(255, 51, 102, 0.4);
+  color: #ff3366;
+}
+
+.btn-record.recording {
+  background: linear-gradient(135deg, #ff3366, #ff0033);
+  color: #ffffff;
+  border-color: #ff3366;
+  animation: recPulse 1.2s infinite alternate;
+}
+
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ff3366;
+  display: inline-block;
+}
+
+.btn-record.recording .rec-dot {
+  background-color: #ffffff;
+  box-shadow: 0 0 8px #ffffff;
+}
+
+@keyframes recPulse {
+  0% { box-shadow: 0 0 4px rgba(255, 51, 102, 0.5); }
+  100% { box-shadow: 0 0 16px rgba(255, 51, 102, 0.9); }
+}
+
+/* Modais de Resumo e Logs */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-card {
+  background: #111827;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 520px;
+  width: 92%;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9);
+  color: #f0f4f8;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #00d2ff;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.modal-close-btn:hover {
+  color: #fff;
+}
+
+.trip-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.stat-val {
+  font-size: 18px;
+  font-weight: 800;
+  font-family: 'Courier New', Courier, monospace;
+  color: #f0f4f8;
+  margin-top: 2px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn-modal {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+}
+
+.btn-modal-primary {
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+  color: #fff;
+  border: none;
+}
+
+.btn-modal-secondary {
+  background: #1f2937;
+  color: #cbd5e1;
+}
+
+/* Grid de Sensores de Telemetria (Argon Dark Cockpit) */
+.sensors-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.sensor-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.sensor-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 210, 255, 0.4);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.card-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gear-header-wrap,
+.hero-header-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag-meta {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+  display: inline-block;
+  user-select: none;
+}
+
+.tag-real {
+  color: #00e676;
+  background: rgba(0, 230, 118, 0.12);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+  box-shadow: 0 0 6px rgba(0, 230, 118, 0.15);
+}
+
+.tag-est {
+  color: #ffb300;
+  background: rgba(255, 179, 0, 0.12);
+  border: 1px solid rgba(255, 179, 0, 0.40);
+  box-shadow: 0 0 6px rgba(255, 179, 0, 0.15);
+}
+
+.chip-meta {
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.card-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+}
+
+.card-icon {
+  font-size: 14px;
+}
+
+.card-num-box {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.card-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.card-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.card-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: #718096;
+  margin-top: 4px;
+  letter-spacing: 0.3px;
+}
+
+.progress-bg {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+  transition: width 0.2s ease;
+}
+
+/* Alertas de Temperatura do Zetec Rocam */
+.temp-ok { color: var(--accent-green) !important; }
+.temp-warm { color: var(--accent-orange) !important; }
+.temp-crit { 
+  color: var(--accent-red) !important; 
+  animation: blinkAlert 0.8s infinite alternate;
+}
+
+@keyframes blinkAlert {
+  0% { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+/* Responsividade para Tablets / Telas de TV Box / Displays Automotivos */
+@media (max-width: 1024px) {
+  .sensors-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .gauge-val {
+    font-size: 38px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-cluster {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+  .center-infocenter {
+    order: -1;
+  }
+  .sensors-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

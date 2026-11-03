@@ -1,0 +1,24 @@
+{
+  "version": "2.0",
+  "mode": "real",
+  "fallback_to_simulation_if_unavailable": true,
+  "serial_port": "AUTO",
+  "baudrate": 115200,
+  "can_bitrate": 500000,
+  "can_target_ecu_id": "0x7E0",
+  "can_response_ecu_id": "0x7E8",
+  "can_interface": "slcan",
+  "server_host": "0.0.0.0",
+  "server_port": 8000,
+  "telemetry_interval_ms": 40,
+  "fuel_tank_capacity_liters": 54.0,
+  "fuel_reserve_liters": 5.0,
+  "fuel_price_per_liter": 6.30,
+  "fuel_type": "flex_auto",
+  "fuel_calibration_k_factor": 1.0,
+  "stale_data_timeout_sec": {
+    "high_freq": 1.5,
+    "med_freq": 4.0,
+    "low_freq": 12.0
+  }
+}
