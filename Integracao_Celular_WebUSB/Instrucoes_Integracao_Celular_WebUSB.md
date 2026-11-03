@@ -75,15 +75,21 @@ Em garagens subterrâneas, rodovias ou áreas sem sinal de operadora móvel (4G/
 ## 4. Protocolo de Comunicação: WebUSB para SLCAN
 
 O microcontrolador **STM32G431** da placa CANable possui um descritor de dispositivo USB com as seguintes propriedades de referência:
-- **Vendor ID (VID):** `0x1D50` (OpenMoko / Geschwister Schneider)
-- **Product ID (PID):** `0x606F` (Geschwister Schneider CANable)
+- **Vendor ID (VID):** `0x16D0` (MCS / CANable V2.1) ou `0x1D50` (OpenMoko / Geschwister Schneider V1)
+- **Product ID (PID):** `0x117E` (CANable V2.1 slcan) ou `0x606F` (CANable V1 candleLight)
 - **Classe USB:** CDC-ACM (Communications and CDC Control) ou Vendor-Specific (quando com firmware *candleLight*).
 
 ### Sequência de Inicialização no JavaScript:
 1. **Filtro de Descoberta:**
    ```javascript
    const device = await navigator.usb.requestDevice({
-     filters: [{ vendorId: 0x1d50, productId: 0x606f }]
+     filters: [
+       { vendorId: 0x16d0, productId: 0x117e },
+       { vendorId: 0x16d0 },
+       { vendorId: 0x1d50, productId: 0x606f },
+       { vendorId: 0x1d50 },
+       { vendorId: 0x0483 }
+     ]
    });
    ```
 2. **Abertura e Configuração de Interface:**

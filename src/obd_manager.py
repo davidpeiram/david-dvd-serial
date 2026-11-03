@@ -67,7 +67,23 @@ class OBDManager:
         self._lock = threading.Lock()
 
         # 3. Detectores e filtros com histerese
-        self.gear_detector = GearDetector(history_len=4, min_consecutive_matches=3)
+        ranges_conf = self.config.get("gear_ratio_ranges")
+        custom_gear_ranges = None
+        if ranges_conf and isinstance(ranges_conf, list):
+            try:
+                custom_gear_ranges = [
+                    (int(item["gear"]), float(item["min"]), float(item["max"]))
+                    for item in ranges_conf
+                ]
+            except Exception as e:
+                print(f"[OBDManager] Aviso: falha ao processar gear_ratio_ranges do config: {e}")
+                custom_gear_ranges = None
+
+        self.gear_detector = GearDetector(
+            history_len=4,
+            min_consecutive_matches=3,
+            ratio_ranges=custom_gear_ranges,
+        )
 
         # 4. Trip Computer (Odômetro Parcial e Tempo de Viagem)
         self.session_start_time = time.time()

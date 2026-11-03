@@ -340,3 +340,32 @@ Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
   * A central original Ford EEC-VI permanecerá 100% intacta, original de fábrica, sem qualquer alteração de mapa, chipagem ou reflash.
   * O escopo do projeto é puramente de instrumentação, telemetria, diagnóstico e cluster digital (Read-Only).
   * Regra formalizada na Seção 8 do AGENTS.md.
+
+
+[CALIBRAÇÃO E CORREÇÃO METROLÓGICA - RELAÇÃO DE MARCHAS CÂMBIO IB5 1.0 (03/11/2026 - 12:30)]
+- Diagnóstico da Não Entrada da 4ª Marcha relatada pelo David (Inbox Celular e log viagem_fiesta_2026-11-03_11-29-27.csv):
+  * Causa-Raiz Técnica Identificada:
+    - O modelo matemático original em gear_detector.py utilizava as relações de engrenagens do câmbio IB5 para motores 1.6 / Europeu (1ª 3.58, 2ª 1.93, 3ª 1.28, 4ª 0.95, 5ª 0.76).
+    - Nessas faixas genéricas, a 3ª marcha estava calibrada de 46.0 a 67.0, e a 4ª marcha de 35.0 a 45.0.
+    - No Ford Fiesta Sedan 1.0 Zetec Rocam Flex, a transmissão Ford IB5 utiliza escalonamento bem mais curto para compensar o motor 1.0L:
+      * 1ª: 4.08:1 (Total com diferencial 4.56 = 18.605 -> RPM/km/h teórico ~169.3, centro empírico ~175)
+      * 2ª: 2.29:1 (Total com diferencial 4.56 = 10.442 -> RPM/km/h teórico ~95.0, centro empírico ~101)
+      * 3ª: 1.52:1 (Total com diferencial 4.56 = 6.931 -> RPM/km/h teórico ~63.1, centro empírico ~65)
+      * 4ª: 1.11:1 (Total com diferencial 4.56 = 5.062 -> RPM/km/h teórico ~46.1, centro empírico ~47)
+      * 5ª: 0.88:1 (Total com diferencial 4.56 = 4.013 -> RPM/km/h teórico ~36.5, centro empírico ~37)
+    - Com pneus originais 175/65 R14 (circunferência = 1.832 m), a 4ª marcha real gera uma razão de exatos 46.5 a 47.5 RPM por km/h.
+    - Como o teto da 3ª marcha no código antigo ia até 67.0 (e o piso da 4ª começava em 45.0), a 4ª marcha física caía obrigatoriamente dentro da faixa da 3ª marcha (Old: 3). Por consequência, a 5ª marcha física (razão ~37) era interpretada como 4ª, e a 5ª quase nunca entrava (apenas 12 frames em 6.709).
+- Validação Empírica no Log de Rodagem Real (viagem_fiesta_2026-11-03_11-29-27.csv - 38 minutos):
+  * Test Case 1 (~1500 RPM e ~32 km/h): Razão 46.8 a 47.4 RPM/km/h -> Old: 3 -> NOVO: 4.
+  * Test Case 2 (Aceleração forte de final de viagem, 63 a 75 km/h, 3000 a 3480 RPM): Razão 46.7 a 47.1 RPM/km/h -> Old: 3 -> NOVO: 4.
+  * 1.382 registros no log de rodagem que estavam marcados erroneamente como 3ª marcha migraram para a 4ª marcha real.
+  * 931 registros marcados erroneamente como 4ª marcha migraram para a 5ª marcha real (totalizando 946 pontos em 5ª marcha).
+- Implementações de Código Concluídas:
+  1. src/gear_detector.py: Atualizadas as constantes GEAR_RATIO_RANGES para o câmbio IB5 1.0 Rocam:
+     * 1ª: [130.0, 240.0] (centro ~175)
+     * 2ª: [80.0, 129.9]  (centro ~101)
+     * 3ª: [55.0, 79.9]   (centro ~65)
+     * 4ª: [41.5, 54.9]   (centro ~47)
+     * 5ª: [24.0, 41.4]   (centro ~37)
+  2. config.json & src/obd_manager.py: Parametrização centralizada em config.json com chave gear_ratio_ranges, permitindo calibração fina externa sem alteração no código Python.
+  3. src/server.py: Configuração padrão atualizada com os novos limites nominais.

@@ -44,6 +44,13 @@ def load_config() -> dict:
         "fuel_price_per_liter": 6.30,
         "fuel_type": "flex_auto",
         "fuel_calibration_k_factor": 1.0,
+        "gear_ratio_ranges": [
+            {"gear": 1, "min": 130.0, "max": 240.0},
+            {"gear": 2, "min": 80.0, "max": 129.9},
+            {"gear": 3, "min": 55.0, "max": 79.9},
+            {"gear": 4, "min": 41.5, "max": 54.9},
+            {"gear": 5, "min": 24.0, "max": 41.4},
+        ],
     }
 
 

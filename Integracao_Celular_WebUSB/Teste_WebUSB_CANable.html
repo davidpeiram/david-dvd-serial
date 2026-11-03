@@ -404,11 +404,14 @@
 
       try {
         log('Abrindo seletor nativo do Android...', 'info');
-        // Filtro pelo VID do CANable (0x1D50) e PID (0x606F) ou genérico
+        // Filtros pelos VIDs oficiais: CANable V2.1 (0x16D0:0x117E), V1 (0x1D50:0x606F) e STM32 (0x0483)
         usbDevice = await navigator.usb.requestDevice({
           filters: [
+            { vendorId: 0x16d0, productId: 0x117e },
+            { vendorId: 0x16d0 },
             { vendorId: 0x1d50, productId: 0x606f },
-            { vendorId: 0x1d50 }
+            { vendorId: 0x1d50 },
+            { vendorId: 0x0483 }
           ]
         });
 
