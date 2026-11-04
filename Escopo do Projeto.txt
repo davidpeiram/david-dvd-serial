@@ -484,3 +484,19 @@ Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
      - Configuradas as propriedades 'android:icon="@mipmap/ic_launcher"' e 'android:roundIcon="@mipmap/ic_launcher_round"' em 'AndroidManifest.xml'.
      - Integrado ícone como favicon e insígnia na barra superior ('brand-section') do Cockpit.
   5. Versão: versionCode 26, versionName "2.3.3".
+
+[ATUALIZAÇÃO MAPA OPENSTREETMAP, GPS MULTI-PROVIDER & UI VERTICAL/HORIZONTAL - RELEASE v2.3.4 (04/11/2026 - 00:02)]
+- Ajustes de Campo Solicitados pelo Usuário:
+  1. Migração Completa para OpenStreetMap (Sem API Key):
+     - Removido provedor CartoDB (que exibia marca d'água 'API KEY REQUIRED carto.com/basemaps/apikey').
+     - Adotado 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' (100% gratuito e sem chave de API), com filtro CSS Cockpit Noturno automático nos temas escuros e visual original no tema claro.
+     - Adicionado User-Agent dedicado no WebView ('FiestaCockpitUSB/2.3.4') e botão '🎯 Centralizar no Veículo' no HUD do mapa.
+  2. Blindagem Total do GPS (Multi-Provider Simultâneo):
+     - Em 'MainActivity.java', substituído o 'else if' excludente por registro simultâneo em 'GPS_PROVIDER', 'NETWORK_PROVIDER' (4G/Wi-Fi) e 'PASSIVE_PROVIDER' com 'minDistance = 0.0f' (atualiza mesmo com o carro parado).
+     - Ao tocar na aba '🗺️ Mapa GPS', o GPS nativo é ativado automaticamente e busca imediatamente a última posição conhecida mais recente entre todos os provedores.
+  3. Layout Vertical (Portrait) vs. Horizontal (Landscape):
+     - Modo Vertical: boxes de Distância, Tempo, Litros e Média ampliados em grade 2x2 de alta legibilidade (fonte 19px negrito, padding 10x14px); seletor de 5 Temas posicionado na segunda linha da barra superior com 'flex-wrap: wrap' (100% visível).
+     - Modo Horizontal: mantido o formato dos boxes de viagem e otimizada a barra superior ocultando subtítulos redundantes em telas compactas, eliminando o corte da palavra 'ECU' no canto direito.
+  4. Otimização de Tamanho do APK:
+     - Removidas duplicatas não utilizadas de 512px em 'res/drawable/', mantendo todos os ícones oficiais em 'res/mipmap-*' e reduzindo o tamanho do instalador em ~870 KB.
+  5. Versão: versionCode 27, versionName "2.3.4".

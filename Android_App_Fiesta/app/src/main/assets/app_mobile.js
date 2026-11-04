@@ -64,9 +64,23 @@ window.switchAppTab = function(tabName) {
     if (btnCockpit) btnCockpit.classList.remove('active');
     if (btnMap) btnMap.classList.add('active');
 
+    // Inicia GPS automaticamente ao entrar na aba do Mapa para garantir fix imediato
+    if (window.AndroidUSB && window.AndroidUSB.startGps) {
+      window.AndroidUSB.startGps();
+      const btnGps = document.getElementById('btn-toggle-gps');
+      if (btnGps) {
+        btnGps.textContent = '📍 GPS ON';
+        btnGps.classList.add('active');
+        btnGps.style.borderColor = 'var(--accent-cyan)';
+        btnGps.style.color = 'var(--accent-cyan)';
+      }
+    }
+
     const LeafletObj = window.L || window.leaflet;
     if (!leafletMap && LeafletObj) {
       initLeafletMap();
+    } else if (leafletMap && state.gpsLat != null && state.gpsLon != null) {
+      leafletMap.setView([state.gpsLat, state.gpsLon], 16, { animate: true });
     }
     // Múltiplos invalidateSize garantem que o WebView redesenhe os tiles nas novas dimensões
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 60);
@@ -77,6 +91,15 @@ window.switchAppTab = function(tabName) {
     if (tabCockpit) tabCockpit.classList.add('active');
     if (btnMap) btnMap.classList.remove('active');
     if (btnCockpit) btnCockpit.classList.add('active');
+  }
+};
+
+window.centerMapOnCar = function() {
+  if (window.AndroidUSB && window.AndroidUSB.startGps) {
+    window.AndroidUSB.startGps();
+  }
+  if (leafletMap && state.gpsLat != null && state.gpsLon != null) {
+    leafletMap.setView([state.gpsLat, state.gpsLon], 17, { animate: true });
   }
 };
 
@@ -137,17 +160,9 @@ function initLeafletMap() {
       attributionControl: false
     }).setView(initialPos, 16);
 
-    // Tiles CartoDB Dark Matter com fallback automático para OpenStreetMap
-    const tileLayer = LeafletObj.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd'
-    });
-    tileLayer.on('tileerror', function(err) {
-      console.warn('Erro ao carregar tile de mapa CartoDB, acionando fallback OSM:', err);
-      if (!tileLayer._osmFallbackDone) {
-        tileLayer._osmFallbackDone = true;
-        tileLayer.setUrl('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
-      }
+    // Tiles Oficiais OpenStreetMap (100% Gratuito e Sem Chave de API)
+    const tileLayer = LeafletObj.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
     });
     tileLayer.addTo(leafletMap);
 

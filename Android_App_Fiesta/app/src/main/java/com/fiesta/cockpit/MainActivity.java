@@ -62,6 +62,7 @@ public class MainActivity extends Activity {
     private LocationManager locationManager;
     private LocationListener locationListener;
     private final AtomicBoolean isGpsTracking = new AtomicBoolean(false);
+    private final AtomicBoolean pendingGpsStart = new AtomicBoolean(false);
 
     private final Map<String, Long> lastBroadcastSentMs = new ConcurrentHashMap<>();
 
@@ -112,6 +113,7 @@ public class MainActivity extends Activity {
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setBlockNetworkImage(false);
         settings.setBlockNetworkLoads(false);
+        settings.setUserAgentString(settings.getUserAgentString() + " FiestaCockpitUSB/2.3.4");
         settings.setMediaPlaybackRequiresUserGesture(false);
         if (Build.VERSION.SDK_INT >= 21) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -184,14 +186,17 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQ_CODE) {
+            boolean granted = false;
             for (int i = 0; i < permissions.length; i++) {
-                if (Manifest.permission.ACCESS_FINE_LOCATION.equals(permissions[i])
+                if ((Manifest.permission.ACCESS_FINE_LOCATION.equals(permissions[i])
+                        || Manifest.permission.ACCESS_COARSE_LOCATION.equals(permissions[i]))
                         && grantResults.length > i && grantResults[i] == PackageManager.PERMISSION_GRANTED) {
-                    if (isGpsTracking.get()) {
-                        startGpsInternal();
-                    }
+                    granted = true;
                     break;
                 }
+            }
+            if (granted && (pendingGpsStart.get() || isGpsTracking.get())) {
+                startGpsInternal();
             }
         }
     }
@@ -225,45 +230,85 @@ public class MainActivity extends Activity {
     }
 
     private synchronized void startGpsInternal() {
-        if (locationManager == null || isGpsTracking.get()) return;
+        if (locationManager == null) return;
         if (Build.VERSION.SDK_INT >= 23) {
-            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSION_REQ_CODE);
+            boolean fineOk = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            boolean coarseOk = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            if (!fineOk && !coarseOk) {
+                pendingGpsStart.set(true);
+                requestPermissions(new String[]{
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                }, PERMISSION_REQ_CODE);
                 return;
             }
         }
+        pendingGpsStart.set(false);
         try {
-            isGpsTracking.set(true);
-            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER,
-                        1000L,
-                        0.5f,
-                        locationListener,
-                        Looper.getMainLooper()
-                );
-            } else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                locationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER,
-                        1500L,
-                        1.0f,
-                        locationListener,
-                        Looper.getMainLooper()
-                );
+            if (!isGpsTracking.get()) {
+                isGpsTracking.set(true);
+                try {
+                    if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                        locationManager.requestLocationUpdates(
+                                LocationManager.GPS_PROVIDER,
+                                1000L,
+                                0.0f,
+                                locationListener,
+                                Looper.getMainLooper()
+                        );
+                    }
+                } catch (Exception ignored) {}
+
+                try {
+                    if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                        locationManager.requestLocationUpdates(
+                                LocationManager.NETWORK_PROVIDER,
+                                1500L,
+                                0.0f,
+                                locationListener,
+                                Looper.getMainLooper()
+                        );
+                    }
+                } catch (Exception ignored) {}
+
+                try {
+                    if (locationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
+                        locationManager.requestLocationUpdates(
+                                LocationManager.PASSIVE_PROVIDER,
+                                1000L,
+                                0.0f,
+                                locationListener,
+                                Looper.getMainLooper()
+                        );
+                    }
+                } catch (Exception ignored) {}
             }
 
-            Location lastLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (lastLoc == null) {
-                lastLoc = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            Location bestLoc = null;
+            String[] providers = new String[]{
+                    LocationManager.GPS_PROVIDER,
+                    LocationManager.NETWORK_PROVIDER,
+                    LocationManager.PASSIVE_PROVIDER
+            };
+            for (String p : providers) {
+                try {
+                    Location l = locationManager.getLastKnownLocation(p);
+                    if (l != null) {
+                        if (bestLoc == null || l.getTime() > bestLoc.getTime()) {
+                            bestLoc = l;
+                        }
+                    }
+                } catch (Exception ignored) {}
             }
-            if (lastLoc != null) {
+
+            if (bestLoc != null) {
                 dispatchGpsToJs(
-                        lastLoc.getLatitude(),
-                        lastLoc.getLongitude(),
-                        lastLoc.hasSpeed() ? (lastLoc.getSpeed() * 3.6f) : 0.0f,
-                        lastLoc.hasAltitude() ? lastLoc.getAltitude() : 0.0,
-                        lastLoc.hasBearing() ? lastLoc.getBearing() : 0.0f,
-                        lastLoc.hasAccuracy() ? lastLoc.getAccuracy() : 999.0f
+                        bestLoc.getLatitude(),
+                        bestLoc.getLongitude(),
+                        bestLoc.hasSpeed() ? (bestLoc.getSpeed() * 3.6f) : 0.0f,
+                        bestLoc.hasAltitude() ? bestLoc.getAltitude() : 0.0,
+                        bestLoc.hasBearing() ? bestLoc.getBearing() : 0.0f,
+                        bestLoc.hasAccuracy() ? bestLoc.getAccuracy() : 999.0f
                 );
             }
             notifyJsGpsStatus(true);
@@ -271,6 +316,7 @@ public class MainActivity extends Activity {
     }
 
     private synchronized void stopGpsInternal() {
+        pendingGpsStart.set(false);
         isGpsTracking.set(false);
         if (locationManager != null && locationListener != null) {
             try {
