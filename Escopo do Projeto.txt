@@ -500,3 +500,23 @@ Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
   4. Otimização de Tamanho do APK:
      - Removidas duplicatas não utilizadas de 512px em 'res/drawable/', mantendo todos os ícones oficiais em 'res/mipmap-*' e reduzindo o tamanho do instalador em ~870 KB.
   5. Versão: versionCode 27, versionName "2.3.4".
+
+[NOVA FUNCIONALIDADE - RELEASE v2.4.0 (04/11/2026 - 00:30)]
+- Scanner Completo de PIDs & DIDs Ford EEC-VI Integrado ao Aplicativo Android (Sem Necessidade de Laptop no Carro):
+  1. Nova Aba Superior '🔍 Scanner ECU':
+     - Adicionada terceira aba no painel móvel ao lado de '🏎️ Cockpit' e '🗺️ Mapa GPS', permitindo auditoria metrológica completa da ECU e do barramento veicular diretamente pelo smartphone ou tablet.
+  2. Varredura Abrangente de 53 Parâmetros e Módulos:
+     - 28 DIDs Específicos Ford UDS (Serviço 0x22): Tensão da Bateria PCM (0x1146), Percentual de Etanol Flex Fuel (0x1682), Temp. Cabeçote do Cilindro CHT (0x1674), Rotação Filtrada (0xF40C), Velocidade Filtrada (0xF40D), Temp. Arrefecimento ECT PCM (0xF405), Carga Calculada PCM (0xF404), MAP PCM (0xF40B), IAT PCM (0xF40F), Tensão Sensor TPS (0x1644), Relé Embreagem A/C (0x1634), Pressão Fluido A/C (0x162B), Eletroventilador Baixa (0x1637) e Alta (0x1638), Relé Bomba Combustível (0x1671), Válvula EVAP Canister (0x0328), Interruptores Pedais (0x1103), Temp. Catalisador (0x1629), Trim Adaptativo Flex (0x1684), Nível Combustível Filtrado (0xDE00), Odômetro Total IPC (0xDD01), Odômetro Trip IPC (0xDD02), Tensão IPC (0x404C), Temp. Externa IPC (0x404E), Status Portas/Capô BCM (0x2001), Travas Elétricas (0x2002), Iluminação (0x2003) e Limpadores (0x2004).
+     - 21 PIDs Padrão OBD-II (Modo 01): Bitmaps de suporte 01-20/21-40/41-60, MIL & DTC Count, RPM, Velocidade, ECT, MAP, TPS, STFT, LTFT, Avanço de Ignição, IAT, Tensão Módulo ECU, Distância c/ MIL, etc.
+     - Diagnóstico de Falhas (Modo 03 Confirmadas & Modo 07 Pendentes) com decodificação automática de códigos P/C/B/U.
+     - Identificação Veicular (Modo 09): Número VIN do chassi e ID de Calibração do software da ECU.
+     - Sniffer de Mensagens Broadcast CAN em Tempo Real: Rastreamento dinâmico de todos os CAN IDs ativos (0x430 boia, 0x422 pedal/torque, 0x201, 0x420, etc.) com cálculo contínuo de frequência em Hz e payload hexadecimal.
+  3. Proteção e Integridade do Barramento CAN (Anti-Colisão):
+     - O loop contínuo de telemetria do cockpit (42ms) é pausado automaticamente durante a execução do scanner ('state.isScanning = true') e retomado imediatamente ao finalizar ou interromper, garantindo que não ocorra sobrecarga ou colisão de frames no barramento HS-CAN a 500 kbps.
+  4. Exportação e Compartilhamento Nativo de Relatório Técnico:
+     - Método Android 'saveAndShareReport(filename, content)' integrado via MediaStore Downloads e Android Intent Chooser (WhatsApp, Google Drive, Gmail, etc.), gerando relatório técnico completo e estruturado com cabeçalho, estatísticas, DIDs suportados e logs de comunicação.
+  5. Auditoria de Código Tripla Realizada:
+     - Pass 1: Sintaxe JS, balanceamento de parênteses, escopos e promessas auditados e validados.
+     - Pass 2: Cruzamento de IDs de elementos HTML e classes CSS (.scan-card, .btn-scan-*, .scanner-container, etc.) e suporte a scroll por toque.
+     - Pass 3: Assinaturas de métodos da ponte nativa 'AndroidUsbBridge' sincronizadas (alias 'sendSlcanMessage', 'sendCommand' e 'saveAndShareReport').
+  6. Versão: versionCode 28, versionName "2.4.0".

@@ -113,7 +113,7 @@ public class MainActivity extends Activity {
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setBlockNetworkImage(false);
         settings.setBlockNetworkLoads(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " FiestaCockpitUSB/2.3.4");
+        settings.setUserAgentString(settings.getUserAgentString() + " FiestaCockpitUSB/2.4.0");
         settings.setMediaPlaybackRequiresUserGesture(false);
         if (Build.VERSION.SDK_INT >= 21) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -654,6 +654,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public boolean sendSlcanMessage(String msg) {
+            return sendCommand(msg);
+        }
+
+        @JavascriptInterface
         public void setSnifferMode(boolean enabled) {
             snifferMode.set(enabled);
         }
@@ -690,6 +695,53 @@ public class MainActivity extends Activity {
                     decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
                 }
             });
+        }
+
+        @JavascriptInterface
+        public String saveAndShareReport(String filename, String content) {
+            try {
+                String cleanName = (filename != null && !filename.isEmpty()) ? filename : "scan_ecu_fiesta.txt";
+                String mime = cleanName.endsWith(".csv") ? "text/csv" : "text/plain";
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentValues values = new ContentValues();
+                    values.put(MediaStore.Downloads.DISPLAY_NAME, cleanName);
+                    values.put(MediaStore.Downloads.MIME_TYPE, mime);
+                    values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+
+                    Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (uri != null) {
+                        try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+                            if (os != null) {
+                                os.write(content.getBytes(StandardCharsets.UTF_8));
+                            }
+                        }
+                        final String savedName = cleanName;
+                        mainHandler.post(() -> Toast.makeText(
+                                MainActivity.this,
+                                "Relatorio salvo em Downloads: " + savedName,
+                                Toast.LENGTH_LONG
+                        ).show());
+
+                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        shareIntent.setType(mime);
+                        shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+                        shareIntent.setClipData(android.content.ClipData.newRawUri("Report", uri));
+                        shareIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName);
+                        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(shareIntent, "Compartilhar Relatorio da ECU"));
+                        return "SAVED:" + cleanName;
+                    }
+                }
+
+                Intent sendIntent = new Intent(Intent.ACTION_SEND);
+                sendIntent.setType(mime);
+                sendIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName);
+                sendIntent.putExtra(Intent.EXTRA_TEXT, content);
+                startActivity(Intent.createChooser(sendIntent, "Exportar Relatorio da ECU"));
+                return "SHARED:" + cleanName;
+            } catch (Exception e) {
+                return "ERROR:" + e.getMessage();
+            }
         }
 
         @JavascriptInterface

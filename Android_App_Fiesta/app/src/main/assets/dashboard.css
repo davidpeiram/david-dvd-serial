@@ -852,3 +852,243 @@ html:not([data-theme="light"]) .leaflet-tile-pane {
     font-size: 11.5px;
   }
 }
+
+
+/* 12. ABA SCANNER DE PIDs & DIDs FORD */
+#tab-scanner {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scanner-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding-bottom: 24px;
+}
+
+.scanner-header-bar {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.scanner-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scanner-status-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--accent-cyan);
+  border: 1px solid var(--border-color);
+  letter-spacing: 0.5px;
+}
+
+.scanner-status-badge.scanning {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+  animation: pulse-rec 1.2s infinite;
+}
+
+.scanner-status-badge.completed {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.scanner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-scan-main {
+  background: var(--accent-green);
+  color: #000;
+  font-weight: 800;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-scan-main:hover {
+  filter: brightness(1.1);
+}
+
+.btn-scan-stop {
+  background: var(--accent-red);
+  color: #fff;
+  font-weight: 800;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-scan-share {
+  background: var(--bg-card-sub);
+  color: var(--accent-cyan);
+  font-weight: 700;
+  border: 1px solid rgba(0, 210, 255, 0.4);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scanner-progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--gauge-track);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.scanner-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+  transition: width 0.15s ease;
+}
+
+.scanner-subtabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-subtab {
+  background: var(--bg-card-sub);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-subtab.active {
+  background: var(--accent-cyan);
+  color: #000;
+  border-color: var(--accent-cyan);
+}
+
+.scanner-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.scan-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.scan-card.positive {
+  border-color: rgba(0, 230, 118, 0.4);
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.08);
+}
+
+.scan-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.scan-card-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.scan-card-badge {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.scan-badge-pcm {
+  background: rgba(0, 230, 118, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+}
+
+.scan-badge-ipc {
+  background: rgba(0, 210, 255, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 210, 255, 0.35);
+}
+
+.scan-badge-bcm {
+  background: rgba(255, 153, 0, 0.15);
+  color: var(--accent-orange);
+  border: 1px solid rgba(255, 153, 0, 0.35);
+}
+
+.scan-badge-obd {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.scan-badge-broadcast {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.scan-card-val {
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--accent-cyan);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.scan-card-meta {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.scan-terminal-box {
+  background: #050811;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px;
+  height: 120px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 10px;
+  color: #94a3b8;
+}

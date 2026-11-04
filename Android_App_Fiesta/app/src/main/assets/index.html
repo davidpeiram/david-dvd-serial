@@ -22,6 +22,7 @@
     <nav class="nav-tabs-bar">
       <button class="tab-btn active" id="tab-btn-cockpit" onclick="switchAppTab('cockpit')">🏎️ Cockpit</button>
       <button class="tab-btn" id="tab-btn-map" onclick="switchAppTab('map')">🗺️ Mapa GPS</button>
+      <button class="tab-btn" id="tab-btn-scanner" onclick="switchAppTab('scanner')">🔍 Scanner ECU</button>
     </nav>
 
     <div id="live-clock" class="top-center-clock">--:--:--</div>
@@ -305,6 +306,63 @@
           </div>
           <button class="btn-ctrl-compact" onclick="centerMapOnCar()" style="margin-top: 4px; width: 100%; text-align: center; padding: 5px 8px;">🎯 Centralizar no Veículo</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ABA 3: SCANNER ECU & AUDITORIA DE PIDs/DIDs FORD -->
+    <div id="tab-scanner" class="tab-content">
+      <div class="scanner-container">
+        
+        <!-- Barra de Controle do Scanner -->
+        <div class="scanner-header-bar">
+          <div class="scanner-status-row">
+            <div>
+              <span id="scan-status-badge" class="scanner-status-badge">PRONTO PARA ESCANEAR</span>
+              <span id="scan-counter-badge" class="tag-meta tag-real" style="margin-left: 6px;">0 RESPOSTAS</span>
+            </div>
+            <div class="scanner-actions">
+              <button id="btn-start-scan" class="btn-scan-main" onclick="startEcuScan('all')">▶️ INICIAR VARREDURA</button>
+              <button id="btn-stop-scan" class="btn-scan-stop" onclick="stopEcuScan()" style="display: none;">⏹️ PARAR</button>
+              <button id="btn-share-report" class="btn-scan-share" onclick="shareEcuReport()">💾 COMPARTILHAR RELATÓRIO</button>
+              <button id="btn-clear-scan" class="btn-trip-act" onclick="clearEcuScanResults()">🔄 LIMPAR</button>
+            </div>
+          </div>
+
+          <!-- Barra de Progresso da Varredura -->
+          <div class="scanner-progress-track">
+            <div id="scan-progress-bar" class="scanner-progress-fill"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 9.5px; color: var(--text-muted);">
+            <span id="scan-current-item">Selecione uma categoria ou clique em Iniciar Varredura</span>
+            <span id="scan-progress-pct">0%</span>
+          </div>
+
+          <!-- Filtros de Visualização -->
+          <div class="scanner-subtabs">
+            <button class="btn-subtab active" id="subtab-all" onclick="filterScanResults('all')">Todos (<span id="count-all">0</span>)</button>
+            <button class="btn-subtab" id="subtab-dids" onclick="filterScanResults('dids')">DIDs Ford UDS (<span id="count-dids">0</span>)</button>
+            <button class="btn-subtab" id="subtab-pids" onclick="filterScanResults('pids')">PIDs OBD-II (<span id="count-pids">0</span>)</button>
+            <button class="btn-subtab" id="subtab-dtcs" onclick="filterScanResults('dtcs')">Falhas DTC (<span id="count-dtcs">0</span>)</button>
+            <button class="btn-subtab" id="subtab-broadcast" onclick="filterScanResults('broadcast')">Broadcast CAN (<span id="count-broadcast">0</span>)</button>
+          </div>
+        </div>
+
+        <!-- Grade de Resultados Descobertos -->
+        <div id="scan-results-container" class="scanner-results-grid">
+          <div class="scan-empty-hint" style="grid-column: 1 / -1; text-align: center; padding: 30px 10px; color: var(--text-muted); font-size: 12px; background: var(--bg-surface); border: 1px dashed var(--border-color); border-radius: 8px;">
+            🔌 <strong>Comunicação Pronta:</strong> Conecte a CANable ao OBD-II do Fiesta, ligue a ignição (KOEO) ou dê partida no motor e toque em <strong>▶️ INICIAR VARREDURA</strong> para auditar todos os PIDs e DIDs da Ford.
+          </div>
+        </div>
+
+        <!-- Log Técnico de Mensagens CAN do Scanner -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-weight: 700; color: var(--text-muted);">
+            <span>📡 LOG TÉCNICO DE COMUNICAÇÃO (ISO 15765-4 / UDS)</span>
+            <span id="scan-log-stats">0 requisições enviadas</span>
+          </div>
+          <div id="scan-term-log" class="scan-terminal-box"></div>
+        </div>
+
       </div>
     </div>
 

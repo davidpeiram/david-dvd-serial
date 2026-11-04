@@ -1,7 +1,7 @@
 /**
  * app_mobile.js - Motor Nativo de Telemetria OBD-II / HS-CAN para Android (CANable V2.1)
  * Ford Fiesta Sedan 1.0 Zetec Rocam Flex (ECU Ford EEC-VI • 500 kbps)
- * Versão v2.3.3 - Cluster Digital Compacto, Correção de Escopo do Mapa Leaflet e Logo Oficial
+ * Versão v2.4.0 - Cluster Digital Compacto, Mapa OpenStreetMap e Scanner Completo de PIDs & DIDs Ford
  */
 
 // Funções Globais Disponíveis no Escopo de Janela
@@ -14,6 +14,11 @@ let isMapInitialized = false;
 const state = {
   usbConnected: false,
   ecuResponding: false,
+  isScanning: false,
+  cancelScan: false,
+  scanResults: [],
+  scanBroadcasts: {},
+  activeScanFilter: 'all',
   hasReceivedFuelFrame: false,
   hasReceivedTorqueFrame: false,
   lastEcuRespMs: 0,
@@ -55,15 +60,20 @@ const state = {
 window.switchAppTab = function(tabName) {
   const tabCockpit = document.getElementById('tab-cockpit');
   const tabMap = document.getElementById('tab-map');
+  const tabScanner = document.getElementById('tab-scanner');
   const btnCockpit = document.getElementById('tab-btn-cockpit');
   const btnMap = document.getElementById('tab-btn-map');
+  const btnScanner = document.getElementById('tab-btn-scanner');
+
+  if (tabCockpit) tabCockpit.classList.toggle('active', tabName === 'cockpit');
+  if (tabMap) tabMap.classList.toggle('active', tabName === 'map');
+  if (tabScanner) tabScanner.classList.toggle('active', tabName === 'scanner');
+
+  if (btnCockpit) btnCockpit.classList.toggle('active', tabName === 'cockpit');
+  if (btnMap) btnMap.classList.toggle('active', tabName === 'map');
+  if (btnScanner) btnScanner.classList.toggle('active', tabName === 'scanner');
 
   if (tabName === 'map') {
-    if (tabCockpit) tabCockpit.classList.remove('active');
-    if (tabMap) tabMap.classList.add('active');
-    if (btnCockpit) btnCockpit.classList.remove('active');
-    if (btnMap) btnMap.classList.add('active');
-
     // Inicia GPS automaticamente ao entrar na aba do Mapa para garantir fix imediato
     if (window.AndroidUSB && window.AndroidUSB.startGps) {
       window.AndroidUSB.startGps();
@@ -86,11 +96,6 @@ window.switchAppTab = function(tabName) {
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 60);
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 500);
-  } else {
-    if (tabMap) tabMap.classList.remove('active');
-    if (tabCockpit) tabCockpit.classList.add('active');
-    if (btnMap) btnMap.classList.remove('active');
-    if (btnCockpit) btnCockpit.classList.add('active');
   }
 };
 
@@ -488,6 +493,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const now = Date.now();
 
+    // Rastreador Sniffer de Broadcast CAN em tempo real
+    const bcast = state.scanBroadcasts[canId];
+    if (!bcast) {
+      state.scanBroadcasts[canId] = { id: canId, count: 1, lastMs: now, dlc: dlc, hex: hexData, hz: 0 };
+    } else {
+      bcast.count++;
+      const dt = now - bcast.lastMs;
+      if (dt > 0) {
+        const instHz = 1000.0 / dt;
+        bcast.hz = Math.round((bcast.hz * 0.7 + instHz * 0.3) * 10) / 10;
+      }
+      bcast.lastMs = now;
+      bcast.dlc = dlc;
+      bcast.hex = hexData;
+    }
+    if (typeof notifyBroadcastUpdate === 'function') {
+      notifyBroadcastUpdate(canId);
+    }
+
+    // Encaminha frame para o motor de varredura ativa de PIDs/DIDs
+    if (typeof handleScannerResponse === 'function') {
+      handleScannerResponse(canId, dlc, bytes, hexData, line);
+    }
+
     // 1. Broadcast 0x430: Nível Real da Boia do Tanque (Byte 0 / 2.55)
     if (canId === 0x430 && bytes.length >= 1) {
       state.hasReceivedFuelFrame = true;
@@ -568,7 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let p3Idx = 0;
 
   setInterval(() => {
-    if (!state.usbConnected) return;
+    if (!state.usbConnected || state.isScanning) return;
     let pidToQuery;
     const mod = pollStep % 5;
     if (mod < 3) {
@@ -1026,3 +1055,644 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-close-logs-list')?.addEventListener('click', () => modalLogsList?.classList.remove('active'));
   document.getElementById('btn-dismiss-logs-list')?.addEventListener('click', () => modalLogsList?.classList.remove('active'));
 });
+
+
+/* ==========================================================================
+   MOTOR DE SCANNER DE PIDs OBD-II & DIDs FORD EEC-VI (v2.4.0)
+   Suporte a UDS Serviço 0x22, PIDs Modo 01, DTCs Modo 03/07, VIN Modo 09 e Sniffer
+   ========================================================================== */
+
+const CANDIDATE_DIDS = [
+  // Ford PCM (0x7E0 / 0x7E8)
+  { id: 0x1146, name: 'Tensão da Bateria (PCM)', unit: 'V', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d.length >= 2 ? (((d[0] << 8) | d[1]) / 100.0).toFixed(2) : (d[0] * 0.1).toFixed(1) },
+  { id: 0x1682, name: 'Percentual de Etanol (Flex)', unit: '%', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => Math.round((d[0] * 100.0) / 255.0) },
+  { id: 0x1674, name: 'Temp. Cabeçote Cilindro (CHT)', unit: '°C', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d.length >= 2 ? Math.round(((d[0] << 8) | d[1]) / 10 - 40) : (d[0] - 40) },
+  { id: 0xF40C, name: 'Rotação Filtrada do Motor', unit: 'RPM', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => Math.floor(((d[0] << 8) | d[1]) / 4) },
+  { id: 0xF40D, name: 'Velocidade Veicular Filtrada', unit: 'km/h', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d[0] },
+  { id: 0xF405, name: 'Temp. Arrefecimento (ECT PCM)', unit: '°C', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d[0] - 40 },
+  { id: 0xF404, name: 'Carga Calculada (Load PCM)', unit: '%', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => Math.round((d[0] * 100.0) / 255.0) },
+  { id: 0xF40B, name: 'Pressão Coletor (MAP PCM)', unit: 'kPa', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d[0] },
+  { id: 0xF40F, name: 'Temp. Ar Admissão (IAT PCM)', unit: '°C', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d[0] - 40 },
+  { id: 0x1644, name: 'Sensor Posição Borboleta (TPS)', unit: 'V', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => (d[0] * 5.0 / 255.0).toFixed(2) },
+  { id: 0x1634, name: 'Relé Embreagem Ar-Condicionado', unit: '', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => (d[0] & 0x01) ? 'ATIVO' : 'DESLIGADO' },
+  { id: 0x162B, name: 'Pressão Fluido A/C', unit: 'kPa', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d.length >= 2 ? ((d[0] << 8) | d[1]) : (d[0] * 10) },
+  { id: 0x1637, name: 'Eletroventilador Baixa Vel. (Low)', unit: '', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => (d[0] & 0x01) ? 'LIGADO' : 'DESLIGADO' },
+  { id: 0x1638, name: 'Eletroventilador Alta Vel. (High)', unit: '', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => (d[0] & 0x01) ? 'LIGADO' : 'DESLIGADO' },
+  { id: 0x1671, name: 'Relé Bomba de Combustível', unit: '', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => (d[0] & 0x01) ? 'ATIVO' : 'DESLIGADO' },
+  { id: 0x0328, name: 'Válvula Purga EVAP Canister', unit: '%', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => Math.round((d[0] * 100.0) / 255.0) },
+  { id: 0x1103, name: 'Switches Pedais (Freio/Embreagem)', unit: '', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => '0x' + (d[0] < 16 ? '0' : '') + d[0].toString(16).toUpperCase() },
+  { id: 0x1629, name: 'Temp. Estimada Catalisador', unit: '°C', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d.length >= 2 ? Math.round(((d[0] << 8) | d[1]) / 10 - 40) : (d[0] * 4) },
+  { id: 0x1684, name: 'Fator Adaptativo Flex (Trim)', unit: '', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d[0] },
+  { id: 0xDE00, name: 'Nível Combustível Filtrado PCM', unit: 'raw', module: 'PCM', targetId: 0x7E0, respId: 0x7E8, cat: 'dids', decode: (d) => d[0] },
+
+  // Ford IPC / Cluster (0x720 / 0x728)
+  { id: 0xDD01, name: 'Odômetro Total Painel', unit: 'km', module: 'IPC', targetId: 0x720, respId: 0x728, cat: 'dids', decode: (d) => d.length >= 3 ? (((d[0] << 16) | (d[1] << 8) | d[2]) * 0.1).toFixed(1) : ((d[0] << 8) | d[1]) },
+  { id: 0xDD02, name: 'Odômetro Parcial (Trip IPC)', unit: 'km', module: 'IPC', targetId: 0x720, respId: 0x728, cat: 'dids', decode: (d) => d.length >= 2 ? (((d[0] << 8) | d[1]) * 0.1).toFixed(1) : d[0] },
+  { id: 0x404C, name: 'Tensão Sistema Elétrico (IPC)', unit: 'V', module: 'IPC', targetId: 0x720, respId: 0x728, cat: 'dids', decode: (d) => ((d[0] * 256 + (d[1] || 0)) / 100.0).toFixed(2) },
+  { id: 0x404E, name: 'Temp. Externa Ambiente (IPC)', unit: '°C', module: 'IPC', targetId: 0x720, respId: 0x728, cat: 'dids', decode: (d) => d[0] - 40 },
+
+  // Ford BCM / Conforto (0x726 / 0x72E)
+  { id: 0x2001, name: 'Status Portas e Capô', unit: '', module: 'BCM', targetId: 0x726, respId: 0x72E, cat: 'dids', decode: (d) => '0x' + (d[0] < 16 ? '0' : '') + d[0].toString(16).toUpperCase() },
+  { id: 0x2002, name: 'Status Travas Elétricas', unit: '', module: 'BCM', targetId: 0x726, respId: 0x72E, cat: 'dids', decode: (d) => '0x' + (d[0] < 16 ? '0' : '') + d[0].toString(16).toUpperCase() },
+  { id: 0x2003, name: 'Interruptores Faróis / Luzes', unit: '', module: 'BCM', targetId: 0x726, respId: 0x72E, cat: 'dids', decode: (d) => '0x' + (d[0] < 16 ? '0' : '') + d[0].toString(16).toUpperCase() },
+  { id: 0x2004, name: 'Status Limpadores Para-brisa', unit: '', module: 'BCM', targetId: 0x726, respId: 0x72E, cat: 'dids', decode: (d) => '0x' + (d[0] < 16 ? '0' : '') + d[0].toString(16).toUpperCase() }
+];
+
+const CANDIDATE_PIDS = [
+  { id: 0x00, name: 'PIDs Suportados [01-20]', unit: 'Bitmap', module: 'OBD', cat: 'pids', decode: (d) => d.map(b => (b < 16 ? '0' : '') + b.toString(16).toUpperCase()).join(' ') },
+  { id: 0x01, name: 'Status Monitor DTC & Luz MIL', unit: '', module: 'OBD', cat: 'pids', decode: (d) => (d[0] & 0x80 ? 'MIL ACESA' : 'MIL APAGADA') + ` (${d[0] & 0x7F} falhas)` },
+  { id: 0x04, name: 'Carga Calculada do Motor', unit: '%', module: 'OBD', cat: 'pids', decode: (d) => Math.round((d[0] * 100.0) / 255.0) },
+  { id: 0x05, name: 'Temp. Líquido Arrefecimento (ECT)', unit: '°C', module: 'OBD', cat: 'pids', decode: (d) => d[0] - 40 },
+  { id: 0x06, name: 'Ajuste Curto Prazo (STFT Banco 1)', unit: '%', module: 'OBD', cat: 'pids', decode: (d) => Math.round(((d[0] - 128) * 100.0 / 128.0) * 10) / 10 },
+  { id: 0x07, name: 'Ajuste Longo Prazo (LTFT Banco 1)', unit: '%', module: 'OBD', cat: 'pids', decode: (d) => Math.round(((d[0] - 128) * 100.0 / 128.0) * 10) / 10 },
+  { id: 0x0B, name: 'Pressão Coletor Admissão (MAP)', unit: 'kPa', module: 'OBD', cat: 'pids', decode: (d) => d[0] },
+  { id: 0x0C, name: 'Rotação do Motor (RPM)', unit: 'RPM', module: 'OBD', cat: 'pids', decode: (d) => Math.floor(((d[0] << 8) | (d[1] || 0)) / 4) },
+  { id: 0x0D, name: 'Velocidade Veicular', unit: 'km/h', module: 'OBD', cat: 'pids', decode: (d) => d[0] },
+  { id: 0x0E, name: 'Avanço de Ignição (Timing)', unit: '°', module: 'OBD', cat: 'pids', decode: (d) => Math.round(((d[0] / 2.0) - 64.0) * 10) / 10 },
+  { id: 0x0F, name: 'Temp. Ar de Admissão (IAT)', unit: '°C', module: 'OBD', cat: 'pids', decode: (d) => d[0] - 40 },
+  { id: 0x11, name: 'Posição Absoluta da Borboleta', unit: '%', module: 'OBD', cat: 'pids', decode: (d) => Math.round((d[0] * 100.0) / 255.0) },
+  { id: 0x1C, name: 'Padrão Homologação OBD', unit: '', module: 'OBD', cat: 'pids', decode: (d) => d[0] === 1 ? 'OBD-II CARB' : (d[0] === 2 ? 'OBD EPA' : `OBD #${d[0]}`) },
+  { id: 0x1F, name: 'Tempo Funcionamento Motor', unit: 'seg', module: 'OBD', cat: 'pids', decode: (d) => ((d[0] << 8) | (d[1] || 0)) },
+  { id: 0x20, name: 'PIDs Suportados [21-40]', unit: 'Bitmap', module: 'OBD', cat: 'pids', decode: (d) => d.map(b => (b < 16 ? '0' : '') + b.toString(16).toUpperCase()).join(' ') },
+  { id: 0x21, name: 'Distância Percorrida c/ MIL', unit: 'km', module: 'OBD', cat: 'pids', decode: (d) => ((d[0] << 8) | (d[1] || 0)) },
+  { id: 0x31, name: 'Distância desde DTCs Apagados', unit: 'km', module: 'OBD', cat: 'pids', decode: (d) => ((d[0] << 8) | (d[1] || 0)) },
+  { id: 0x33, name: 'Pressão Barométrica Atmosférica', unit: 'kPa', module: 'OBD', cat: 'pids', decode: (d) => d[0] },
+  { id: 0x40, name: 'PIDs Suportados [41-60]', unit: 'Bitmap', module: 'OBD', cat: 'pids', decode: (d) => d.map(b => (b < 16 ? '0' : '') + b.toString(16).toUpperCase()).join(' ') },
+  { id: 0x42, name: 'Tensão Módulo de Controle ECU', unit: 'V', module: 'OBD', cat: 'pids', decode: (d) => (((d[0] << 8) | (d[1] || 0)) / 1000.0).toFixed(2) },
+  { id: 0x45, name: 'Posição Relativa da Borboleta', unit: '%', module: 'OBD', cat: 'pids', decode: (d) => Math.round((d[0] * 100.0) / 255.0) }
+];
+
+let activeScanPending = null;
+let lastBcastUiUpdate = 0;
+
+function appendScanLog(msg, type) {
+  const box = document.getElementById('scan-term-log');
+  if (!box) return;
+  const line = document.createElement('div');
+  line.className = `term-line ${type || ''}`;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  box.appendChild(line);
+  if (box.children.length > 80) {
+    box.removeChild(box.firstChild);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+function getNrcDescription(nrc) {
+  switch (nrc) {
+    case 0x11: return 'NRC 0x11 (Serviço Não Suportado)';
+    case 0x12: return 'NRC 0x12 (Subfunção Não Suportada)';
+    case 0x22: return 'NRC 0x22 (Condições Inadequadas)';
+    case 0x31: return 'NRC 0x31 (Parâmetro Fora de Faixa)';
+    case 0x78: return 'NRC 0x78 (Resposta Pendente)';
+    default: return `NRC 0x${nrc ? nrc.toString(16).toUpperCase() : '??'} (Rejeição ECU)`;
+  }
+}
+
+function decodeDtcBytes(b1, b2) {
+  if (b1 === 0 && b2 === 0) return null;
+  const prefixChar = ['P', 'C', 'B', 'U'][(b1 >> 6) & 0x03];
+  const digit1 = (b1 >> 4) & 0x03;
+  const digit2 = b1 & 0x0F;
+  const digit3 = (b2 >> 4) & 0x0F;
+  const digit4 = b2 & 0x0F;
+  return `${prefixChar}${digit1}${digit2.toString(16).toUpperCase()}${digit3.toString(16).toUpperCase()}${digit4.toString(16).toUpperCase()}`;
+}
+
+function notifyBroadcastUpdate(canId) {
+  const now = Date.now();
+  if (now - lastBcastUiUpdate > 800) {
+    lastBcastUiUpdate = now;
+    if (state.activeScanFilter === 'broadcast' || state.activeScanFilter === 'all') {
+      updateScanCounts();
+      renderScanGrid();
+    }
+  }
+}
+
+function handleScannerResponse(canId, dlc, bytes, hexData, line) {
+  if (activeScanPending && activeScanPending.matchCheck) {
+    const matched = activeScanPending.matchCheck(canId, dlc, bytes);
+    if (matched) {
+      appendScanLog(`RX <- ${line}`, matched.success ? 'term-rx' : 'term-nrc');
+      matched.hex = hexData;
+      matched.canId = canId;
+      activeScanPending.resolve(matched);
+    }
+  }
+}
+
+function sendDiagnosticQuery(query) {
+  return new Promise((resolve) => {
+    const sendFn = window.AndroidUSB ? (window.AndroidUSB.sendSlcanMessage || window.AndroidUSB.sendCommand) : null;
+    if (!state.usbConnected || !sendFn) {
+      resolve({ status: 'no_usb', text: 'USB Desconectado' });
+      return;
+    }
+
+    let frame = '';
+    let expectedRespId = 0x7E8;
+    let matchCheck = null;
+
+    if (query.type === 'did') {
+      const targetId = query.targetId || 0x7E0;
+      expectedRespId = query.respId || (targetId + 8);
+      const hi = (query.id >> 8) & 0xFF;
+      const lo = query.id & 0xFF;
+      const hiHex = (hi < 16 ? '0' : '') + hi.toString(16).toUpperCase();
+      const loHex = (lo < 16 ? '0' : '') + lo.toString(16).toUpperCase();
+      const targetHex = targetId.toString(16).toUpperCase().padStart(3, '0');
+      frame = `t${targetHex}80322${hiHex}${loHex}00000000\r`;
+
+      matchCheck = (canId, dlc, bytes) => {
+        if (canId !== expectedRespId) return null;
+        if (bytes.length >= 4 && bytes[1] === 0x62 && bytes[2] === hi && bytes[3] === lo) {
+          return { success: true, data: bytes.slice(4) };
+        }
+        if (bytes.length >= 3 && bytes[1] === 0x7F && bytes[2] === 0x22) {
+          return { success: false, nrc: bytes[3] };
+        }
+        return null;
+      };
+    } else if (query.type === 'pid') {
+      const hexPid = (query.id < 16 ? '0' : '') + query.id.toString(16).toUpperCase();
+      frame = `t7E080201${hexPid}00000000\r`;
+      expectedRespId = 0x7E8;
+      matchCheck = (canId, dlc, bytes) => {
+        if (canId !== 0x7E8) return null;
+        if (bytes.length >= 3 && bytes[1] === 0x41 && bytes[2] === query.id) {
+          return { success: true, data: bytes.slice(3) };
+        }
+        if (bytes.length >= 3 && bytes[1] === 0x7F && bytes[2] === 0x01) {
+          return { success: false, nrc: bytes[3] };
+        }
+        return null;
+      };
+    } else if (query.type === 'dtc_stored') {
+      frame = `t7E080103000000000000\r`;
+      expectedRespId = 0x7E8;
+      matchCheck = (canId, dlc, bytes) => {
+        if (canId !== 0x7E8) return null;
+        if (bytes.length >= 2 && bytes[1] === 0x43) {
+          return { success: true, data: bytes.slice(2) };
+        }
+        if (bytes.length >= 3 && bytes[1] === 0x7F && bytes[2] === 0x03) {
+          return { success: false, nrc: bytes[3] };
+        }
+        return null;
+      };
+    } else if (query.type === 'dtc_pending') {
+      frame = `t7E080107000000000000\r`;
+      expectedRespId = 0x7E8;
+      matchCheck = (canId, dlc, bytes) => {
+        if (canId !== 0x7E8) return null;
+        if (bytes.length >= 2 && bytes[1] === 0x47) {
+          return { success: true, data: bytes.slice(2) };
+        }
+        if (bytes.length >= 3 && bytes[1] === 0x7F && bytes[2] === 0x07) {
+          return { success: false, nrc: bytes[3] };
+        }
+        return null;
+      };
+    } else if (query.type === 'mode09') {
+      const hexPid = (query.id < 16 ? '0' : '') + query.id.toString(16).toUpperCase();
+      frame = `t7E080209${hexPid}00000000\r`;
+      expectedRespId = 0x7E8;
+      matchCheck = (canId, dlc, bytes) => {
+        if (canId !== 0x7E8) return null;
+        if (bytes.length >= 3 && bytes[1] === 0x49) {
+          return { success: true, data: bytes.slice(3) };
+        }
+        if (bytes.length >= 3 && bytes[1] === 0x7F && bytes[2] === 0x09) {
+          return { success: false, nrc: bytes[3] };
+        }
+        return null;
+      };
+    }
+
+    const timer = setTimeout(() => {
+      activeScanPending = null;
+      resolve({ success: false, status: 'timeout', text: 'Sem resposta (Timeout)' });
+    }, 140);
+
+    activeScanPending = {
+      matchCheck,
+      resolve: (res) => {
+        clearTimeout(timer);
+        activeScanPending = null;
+        resolve(res);
+      }
+    };
+
+    appendScanLog(`TX -> ${frame.trim()}`, 'term-tx');
+    sendFn.call(window.AndroidUSB, frame);
+  });
+}
+
+function getBroadcastItems() {
+  return Object.values(state.scanBroadcasts).map(b => {
+    let name = 'Mensagem Periódica CAN';
+    if (b.id === 0x430) name = 'Boia de Combustível (0x430)';
+    else if (b.id === 0x422) name = 'Torque / Demanda Pedal (0x422)';
+    else if (b.id === 0x201) name = 'Painel / Status Freio ABS (0x201)';
+    else if (b.id === 0x420) name = 'Status Temp. / Eletroventilador (0x420)';
+
+    return {
+      key: `bcast_${b.id}`,
+      title: `[CAN 0x${b.id.toString(16).toUpperCase()}] ${name}`,
+      val: `${b.hz.toFixed(1)} Hz`,
+      meta: `Total: ${b.count} frames • DLC ${b.dlc} • HEX: ${b.hex}`,
+      badgeText: 'BROADCAST',
+      badgeClass: 'scan-badge-broadcast',
+      positive: true,
+      cat: 'broadcast'
+    };
+  });
+}
+
+function renderScanGrid() {
+  const container = document.getElementById('scan-results-container');
+  if (!container) return;
+
+  const filter = state.activeScanFilter || 'all';
+  let itemsToRender = [];
+
+  if (filter === 'broadcast') {
+    itemsToRender = getBroadcastItems();
+  } else {
+    itemsToRender = state.scanResults.filter(r => {
+      if (filter === 'all') return true;
+      return r.cat === filter;
+    });
+
+    if (filter === 'all') {
+      itemsToRender = itemsToRender.concat(getBroadcastItems());
+    }
+  }
+
+  if (!itemsToRender.length) {
+    container.innerHTML = `
+      <div class="scan-empty-hint" style="grid-column: 1 / -1; text-align: center; padding: 30px 10px; color: var(--text-muted); font-size: 12px; background: var(--bg-surface); border: 1px dashed var(--border-color); border-radius: 8px;">
+        🔌 <strong>Nenhum item para exibir.</strong> Conecte a CANable ao OBD-II do Fiesta e toque em <strong>▶️ INICIAR VARREDURA</strong> para auditar a ECU.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = itemsToRender.map(item => `
+    <div class="scan-card ${item.positive ? 'positive' : ''}">
+      <div class="scan-card-top">
+        <span class="scan-card-title">${item.title}</span>
+        <span class="scan-card-badge ${item.badgeClass}">${item.badgeText}</span>
+      </div>
+      <div class="scan-card-val" style="${!item.positive ? 'color: var(--text-muted); font-size: 13.5px;' : ''}">${item.val}</div>
+      <div class="scan-card-meta">${item.meta}</div>
+    </div>
+  `).join('');
+}
+
+function updateScanCounts() {
+  const countAll = document.getElementById('count-all');
+  const countDids = document.getElementById('count-dids');
+  const countPids = document.getElementById('count-pids');
+  const countDtcs = document.getElementById('count-dtcs');
+  const countBcast = document.getElementById('count-broadcast');
+  const counterBadge = document.getElementById('scan-counter-badge');
+
+  const bcastCount = Object.keys(state.scanBroadcasts).length;
+  const didsCount = state.scanResults.filter(r => r.cat === 'dids').length;
+  const pidsCount = state.scanResults.filter(r => r.cat === 'pids').length;
+  const dtcsCount = state.scanResults.filter(r => r.cat === 'dtcs').length;
+  const total = state.scanResults.length + bcastCount;
+  const okTotal = state.scanResults.filter(r => r.positive).length + bcastCount;
+
+  if (countAll) countAll.textContent = total;
+  if (countDids) countDids.textContent = didsCount;
+  if (countPids) countPids.textContent = pidsCount;
+  if (countDtcs) countDtcs.textContent = dtcsCount;
+  if (countBcast) countBcast.textContent = bcastCount;
+  if (counterBadge) counterBadge.textContent = `${okTotal} RESPOSTAS`;
+}
+
+window.filterScanResults = function(cat) {
+  state.activeScanFilter = cat;
+  document.querySelectorAll('.scanner-subtabs .btn-subtab').forEach(b => b.classList.remove('active'));
+  document.getElementById(`subtab-${cat}`)?.classList.add('active');
+  renderScanGrid();
+};
+
+window.clearEcuScanResults = function() {
+  state.scanResults = [];
+  state.scanBroadcasts = {};
+  renderScanGrid();
+  updateScanCounts();
+  const progressBar = document.getElementById('scan-progress-bar');
+  if (progressBar) progressBar.style.width = '0%';
+  const pct = document.getElementById('scan-progress-pct');
+  if (pct) pct.textContent = '0%';
+  const curr = document.getElementById('scan-current-item');
+  if (curr) curr.textContent = 'Pronto para escanear';
+  const badge = document.getElementById('scan-status-badge');
+  if (badge) {
+    badge.textContent = 'PRONTO PARA ESCANEAR';
+    badge.style.background = 'rgba(0, 230, 118, 0.15)';
+    badge.style.color = 'var(--accent-green)';
+  }
+  const termLog = document.getElementById('scan-term-log');
+  if (termLog) termLog.innerHTML = '';
+};
+
+window.stopEcuScan = function() {
+  state.cancelScan = true;
+  state.isScanning = false;
+  const btnStart = document.getElementById('btn-start-scan');
+  const btnStop = document.getElementById('btn-stop-scan');
+  if (btnStart) btnStart.style.display = 'inline-block';
+  if (btnStop) btnStop.style.display = 'none';
+  const badge = document.getElementById('scan-status-badge');
+  if (badge) {
+    badge.textContent = 'VARREDURA INTERROMPIDA';
+    badge.style.background = 'rgba(255, 171, 0, 0.2)';
+    badge.style.color = '#ffab00';
+  }
+};
+
+window.startEcuScan = async function(filterType = 'all') {
+  if (state.isScanning) return;
+  state.isScanning = true;
+  state.cancelScan = false;
+
+  const btnStart = document.getElementById('btn-start-scan');
+  const btnStop = document.getElementById('btn-stop-scan');
+  if (btnStart) btnStart.style.display = 'none';
+  if (btnStop) btnStop.style.display = 'inline-block';
+
+  const badge = document.getElementById('scan-status-badge');
+  if (badge) {
+    badge.textContent = 'ESCANEANDO BARRAMENTO...';
+    badge.style.background = 'rgba(0, 229, 255, 0.2)';
+    badge.style.color = 'var(--accent-cyan)';
+  }
+
+  const tasks = [];
+
+  // 1. Diagnóstico de Falhas
+  tasks.push({
+    type: 'dtc_stored',
+    title: 'Falhas Confirmadas (Modo 03)',
+    cat: 'dtcs',
+    module: 'PCM',
+    badgeClass: 'scan-badge-pcm',
+    key: 'dtc_stored'
+  });
+  tasks.push({
+    type: 'dtc_pending',
+    title: 'Falhas Pendentes (Modo 07)',
+    cat: 'dtcs',
+    module: 'PCM',
+    badgeClass: 'scan-badge-pcm',
+    key: 'dtc_pending'
+  });
+
+  // 2. Informações de Identificação do Veículo
+  tasks.push({
+    type: 'mode09',
+    id: 0x02,
+    title: 'Número VIN do Chassi (Modo 09)',
+    cat: 'pids',
+    module: 'PCM',
+    badgeClass: 'scan-badge-obd',
+    key: 'm09_vin'
+  });
+  tasks.push({
+    type: 'mode09',
+    id: 0x04,
+    title: 'Calibração PCM Software (Modo 09)',
+    cat: 'pids',
+    module: 'PCM',
+    badgeClass: 'scan-badge-obd',
+    key: 'm09_cal'
+  });
+
+  // 3. DIDs Específicos Ford UDS (Serviço 0x22)
+  CANDIDATE_DIDS.forEach(d => {
+    tasks.push({
+      type: 'did',
+      id: d.id,
+      title: `[0x${d.id.toString(16).toUpperCase()}] ${d.name}`,
+      unit: d.unit,
+      cat: d.cat,
+      module: d.module,
+      targetId: d.targetId,
+      respId: d.respId,
+      decode: d.decode,
+      badgeClass: d.module === 'PCM' ? 'scan-badge-pcm' : (d.module === 'IPC' ? 'scan-badge-ipc' : 'scan-badge-bcm'),
+      key: `did_${d.id.toString(16).toUpperCase()}`
+    });
+  });
+
+  // 4. PIDs Padrão OBD-II (Modo 01)
+  CANDIDATE_PIDS.forEach(p => {
+    tasks.push({
+      type: 'pid',
+      id: p.id,
+      title: `[PID 0x${p.id.toString(16).toUpperCase().padStart(2, '0')}] ${p.name}`,
+      unit: p.unit,
+      cat: p.cat,
+      module: p.module,
+      decode: p.decode,
+      badgeClass: 'scan-badge-obd',
+      key: `pid_${p.id.toString(16).toUpperCase().padStart(2, '0')}`
+    });
+  });
+
+  const total = tasks.length;
+  let completed = 0;
+  let reqCount = 0;
+
+  for (let i = 0; i < tasks.length; i++) {
+    if (state.cancelScan) break;
+    const task = tasks[i];
+
+    const currElem = document.getElementById('scan-current-item');
+    if (currElem) currElem.textContent = `Consultando: ${task.title}`;
+
+    reqCount++;
+    const logStats = document.getElementById('scan-log-stats');
+    if (logStats) logStats.textContent = `${reqCount} requisições enviadas`;
+
+    const resp = await sendDiagnosticQuery(task);
+
+    let valStr = '';
+    let metaStr = '';
+    let isPositive = false;
+
+    if (resp.success) {
+      isPositive = true;
+      if (task.type === 'dtc_stored' || task.type === 'dtc_pending') {
+        const dtcList = [];
+        const d = resp.data || [];
+        for (let b = 1; b < d.length; b += 2) {
+          if (b + 1 < d.length) {
+            const dtc = decodeDtcBytes(d[b], d[b + 1]);
+            if (dtc) dtcList.push(dtc);
+          }
+        }
+        valStr = dtcList.length ? dtcList.join(', ') : 'Nenhuma Falha Detectada';
+        metaStr = `ECU Ford EEC-VI (0x7E8) • ${dtcList.length} DTCs`;
+      } else if (task.type === 'mode09') {
+        const d = resp.data || [];
+        valStr = d.map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : '').join('').trim() || resp.hex;
+        metaStr = `ECU Ford (0x7E8) • HEX: ${resp.hex}`;
+      } else if (task.decode) {
+        try {
+          const res = task.decode(resp.data || []);
+          valStr = `${res}${task.unit ? ' ' + task.unit : ''}`;
+        } catch (e) {
+          valStr = resp.hex;
+        }
+        const respIdHex = (task.respId || 0x7E8).toString(16).toUpperCase();
+        metaStr = `Módulo ${task.module} (0x${respIdHex}) • HEX: ${resp.hex}`;
+      } else {
+        valStr = resp.hex;
+        metaStr = `Módulo ${task.module} (0x7E8)`;
+      }
+    } else {
+      isPositive = false;
+      if (resp.status === 'timeout') {
+        valStr = 'Sem Resposta (Timeout)';
+        metaStr = `Módulo ${task.module} • Não respondeu ao comando`;
+      } else if (resp.nrc !== undefined) {
+        valStr = getNrcDescription(resp.nrc);
+        metaStr = `Módulo ${task.module} • Negativa UDS NRC 0x${resp.nrc.toString(16).toUpperCase()}`;
+      } else {
+        valStr = resp.text || 'Erro de Comunicação';
+        metaStr = 'Interface CANable';
+      }
+    }
+
+    const existingIdx = state.scanResults.findIndex(r => r.key === task.key);
+    const resultObj = {
+      key: task.key,
+      title: task.title,
+      val: valStr,
+      meta: metaStr,
+      badgeText: task.module,
+      badgeClass: task.badgeClass,
+      positive: isPositive,
+      cat: task.cat
+    };
+
+    if (existingIdx >= 0) {
+      state.scanResults[existingIdx] = resultObj;
+    } else {
+      state.scanResults.push(resultObj);
+    }
+
+    completed++;
+    const pct = Math.round((completed / total) * 100);
+    const progressBar = document.getElementById('scan-progress-bar');
+    if (progressBar) progressBar.style.width = `${pct}%`;
+    const pctElem = document.getElementById('scan-progress-pct');
+    if (pctElem) pctElem.textContent = `${pct}%`;
+
+    renderScanGrid();
+    updateScanCounts();
+
+    // Pausa preventiva de 25ms para evitar saturação do buffer da ECU
+    await new Promise(r => setTimeout(r, 25));
+  }
+
+  state.isScanning = false;
+  if (btnStart) btnStart.style.display = 'inline-block';
+  if (btnStop) btnStop.style.display = 'none';
+
+  if (badge) {
+    badge.textContent = state.cancelScan ? 'VARREDURA INTERROMPIDA' : 'VARREDURA CONCLUÍDA';
+    badge.style.background = state.cancelScan ? 'rgba(255, 171, 0, 0.2)' : 'rgba(0, 230, 118, 0.2)';
+    badge.style.color = state.cancelScan ? '#ffab00' : 'var(--accent-green)';
+  }
+
+  const currElem = document.getElementById('scan-current-item');
+  if (currElem) {
+    const okCount = state.scanResults.filter(r => r.positive).length;
+    currElem.textContent = `Varredura finalizada: ${okCount} parâmetros suportados de ${state.scanResults.length} consultados.`;
+  }
+};
+
+window.shareEcuReport = function() {
+  const now = new Date();
+  const dateStr = now.toISOString().replace('T', ' ').slice(0, 19);
+
+  let totalDids = 0, okDids = 0;
+  let totalPids = 0, okPids = 0;
+
+  const didLines = [];
+  const pidLines = [];
+  const dtcLines = [];
+
+  state.scanResults.forEach(r => {
+    if (r.cat === 'dids') {
+      totalDids++;
+      if (r.positive) okDids++;
+      didLines.push(`- ${r.title}: ${r.val} (${r.meta})`);
+    } else if (r.cat === 'pids') {
+      totalPids++;
+      if (r.positive) okPids++;
+      pidLines.push(`- ${r.title}: ${r.val} (${r.meta})`);
+    } else if (r.cat === 'dtcs') {
+      dtcLines.push(`- ${r.title}: ${r.val} (${r.meta})`);
+    }
+  });
+
+  const bcastLines = [];
+  Object.values(state.scanBroadcasts).forEach(b => {
+    bcastLines.push(`- ID 0x${b.id.toString(16).toUpperCase()}: Freq ${b.hz.toFixed(1)} Hz | Total Frames: ${b.count} | Último DLC ${b.dlc} [${b.hex}]`);
+  });
+
+  const report = [
+    '================================================================',
+    'RELATÓRIO DE AUDITORIA DE PIDs & DIDs FORD EEC-VI',
+    'Veículo: Ford Fiesta Sedan 1.0 Zetec Rocam Flex (2010)',
+    'Interface: LC_CANABLE_V2.1 (STM32G431 SLCAN @ 500 kbps)',
+    `Data do Diagnóstico: ${dateStr}`,
+    '================================================================',
+    '',
+    '[1] RESUMO GERAL DA VARREDURA',
+    `- DIDs Ford UDS Testados: ${totalDids} (Suportados: ${okDids})`,
+    `- PIDs Padrão OBD-II Testados: ${totalPids} (Suportados: ${okPids})`,
+    `- Identificadores CAN Ativos no Barramento: ${Object.keys(state.scanBroadcasts).length}`,
+    '',
+    '[2] DIDs ESPECÍFICOS FORD UDS (SERVIÇO 0x22)',
+    didLines.length ? didLines.join('\n') : 'Nenhum DID consultado ainda.',
+    '',
+    '[3] PIDs PADRÃO OBD-II (MODO 01)',
+    pidLines.length ? pidLines.join('\n') : 'Nenhum PID consultado ainda.',
+    '',
+    '[4] CÓDIGOS DE FALHA & DIAGNÓSTICO (MODO 03 / 07)',
+    dtcLines.length ? dtcLines.join('\n') : 'Nenhuma verificação de DTC realizada.',
+    '',
+    '[5] SNIFFER BROADCAST DE MENSAGENS NO BARRAMENTO CAN',
+    bcastLines.length ? bcastLines.join('\n') : 'Nenhuma mensagem de broadcast detectada no barramento.',
+    '',
+    '================================================================',
+    'Auditoria realizada com sucesso pelo Fiesta Cockpit USB v2.4.0',
+    'Engenharia Automotiva • David Peixoto Ramos'
+  ].join('\n');
+
+  const filename = `scanner_fiesta_${dateStr.replace(/[- :]/g, '_')}.txt`;
+
+  if (window.AndroidUSB && window.AndroidUSB.saveAndShareReport) {
+    window.AndroidUSB.saveAndShareReport(filename, report);
+  } else {
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+};
