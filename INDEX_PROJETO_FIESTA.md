@@ -108,6 +108,9 @@ Projetos/Projeto Fiesta Zetec Rocam 1.0/
 │   ├── Android_App_Fiesta/         # Projeto Android Nativo (APK com usb-serial-for-android + Cockpit WebView)
 │   │   └── app/src/main/           # MainActivity.java (CDC 16D0:117E) + assets (Cockpit & Terminal)
 │   │
-│   └── apk/                        # Instalador compilado pronto para o celular
-│       └── Fiesta_Cockpit_USB.apk  # APK nativo gerado automaticamente via GitHub Actions
+│   └── apk/                        # Repositório de instaladores Android compilados (Histórico Completo)
+│       ├── Fiesta_Cockpit_USB.apk        # Ponteiro da versão mais recente (Latest Build)
+│       ├── Fiesta_Cockpit_USB_v2.3.1.apk # Versão v2.3.1 (Blindagem Android 14 FGS, Permissões & Leaflet Resize)
+│       ├── Fiesta_Cockpit_USB_v2.3.0.apk # Versão v2.3.0 (Foreground Service, GPS Map, Cluster Compacto & 5 Temas)
+│       └── Fiesta_Cockpit_USB_v2.2.0.apk # Versão v2.2.0 (Release nativa inicial com gauges e USB OTG)
 ```

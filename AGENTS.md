@@ -117,3 +117,12 @@ Todas as interações do projeto com o veículo operam exclusivamente em regime 
    - SAE J1979 Modo 03 (Leitura de Códigos de Falha DTCs);
    - Ford UDS Serviço 0x22 (*ReadDataByIdentifier* - Leitura pontual de parâmetros como CHT, bateria e hodômetro).
 3. **Proibição Estrita de Serviços de Gravação:** Bloqueado qualquer envio de rotinas de escrita ou reprogramação de memória (Serviços UDS 0x34 *RequestDownload*, 0x36 *TransferData*, 0x37 *RequestTransferExit* ou Modo 04 de limpeza sem autorização).
+
+
+---
+
+## 9. Política de Versionamento e Preservação de Releases de APKs (apk/)
+
+- **Arquivamento Permanente de Releases:** Toda compilação e release do aplicativo nativo Android (`Android_App_Fiesta/`) deve obrigatoriamente gerar e preservar na pasta `apk/` o arquivo versionado nominal correspondente ao `versionName` do `build.gradle` (ex: `Fiesta_Cockpit_USB_v2.2.0.apk`, `Fiesta_Cockpit_USB_v2.3.0.apk`, `Fiesta_Cockpit_USB_v2.3.1.apk`), mantendo concomitantemente o arquivo `Fiesta_Cockpit_USB.apk` atualizado como ponteiro da versão mais recente (*latest*).
+- **Proibição de Deleção de Versões Históricas:** Nunca delete ou sobrescreva versões anteriores na pasta `apk/`. O histórico completo de builds permite ao usuário realizar rollbacks imediatos em caso de regressão e efetuar testes cruzados de estabilidade entre smartphone e tablet.
+- **Automação no CI/CD:** O pipeline do GitHub Actions (`.github/workflows/build_android_apk.yml`) extrai automaticamente a variável `versionName` e publica ambos os arquivos no repositório.

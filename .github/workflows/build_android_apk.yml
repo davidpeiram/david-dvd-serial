@@ -36,13 +36,17 @@ jobs:
       - name: Publish APK to apk/ folder in repo
         run: |
           mkdir -p apk
+          VERSION=$(grep 'versionName' Android_App_Fiesta/app/build.gradle | sed 's/.*versionName "\(.*\)".*/\1/')
           cp Android_App_Fiesta/app/build/outputs/apk/debug/app-debug.apk apk/Fiesta_Cockpit_USB.apk
+          if [ -n "$VERSION" ]; then
+            cp Android_App_Fiesta/app/build/outputs/apk/debug/app-debug.apk "apk/Fiesta_Cockpit_USB_v${VERSION}.apk"
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main || true
-          git add apk/Fiesta_Cockpit_USB.apk
+          git add apk/*.apk
           if ! git diff --cached --quiet; then
-            git commit -m "chore(apk): publish compiled Fiesta_Cockpit_USB.apk [skip ci]"
+            git commit -m "chore(apk): publish compiled Fiesta_Cockpit_USB v${VERSION} [skip ci]"
             git push origin main
           fi
 
