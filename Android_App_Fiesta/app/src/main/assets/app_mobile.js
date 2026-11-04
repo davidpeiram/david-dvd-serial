@@ -1,7 +1,7 @@
 /**
  * app_mobile.js - Motor Nativo de Telemetria OBD-II / HS-CAN para Android (CANable V2.1)
  * Ford Fiesta Sedan 1.0 Zetec Rocam Flex (ECU Ford EEC-VI • 500 kbps)
- * Versão v2.3 - Cluster Digital Compacto, GPS Sob Demanda e 5 Temas
+ * Versão v2.3.2 - Cluster Digital Compacto, Correção Mapa GPS e Rigor Metrológico
  */
 
 // Funções Globais Disponíveis no Escopo de Janela
@@ -22,7 +22,8 @@ window.switchAppTab = function(tabName) {
     if (btnCockpit) btnCockpit.classList.remove('active');
     if (btnMap) btnMap.classList.add('active');
 
-    if (!isMapInitialized && window.L) {
+    const LeafletObj = window.L || window.leaflet;
+    if (!isMapInitialized && LeafletObj) {
       initLeafletMap();
     }
     setTimeout(() => {
@@ -79,7 +80,8 @@ window.toggleGpsTracking = function() {
 
 function initLeafletMap() {
   const container = document.getElementById('leaflet-map');
-  if (!container || !window.L || leafletMap) return;
+  const LeafletObj = window.L || window.leaflet;
+  if (!container || !LeafletObj || leafletMap) return;
 
   try {
     // Coordenadas iniciais: última posição conhecida do GPS ou Região RJ / Niterói (-22.9068, -43.1729)
@@ -87,38 +89,43 @@ function initLeafletMap() {
       ? [state.gpsLat, state.gpsLon]
       : [-22.9068, -43.1729];
 
-    leafletMap = L.map('leaflet-map', {
+    leafletMap = LeafletObj.map('leaflet-map', {
       zoomControl: true,
       attributionControl: false
     }).setView(initialPos, 16);
 
-    // Tiles CartoDB Dark Matter (Estilo Cockpit Noturno)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Tiles CartoDB Dark Matter (Estilo Cockpit Noturno) - sem token {r} para evitar exceção no Leaflet
+    const tileLayer = LeafletObj.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
       maxZoom: 19,
       subdomains: 'abcd'
-    }).addTo(leafletMap);
+    });
+    tileLayer.addTo(leafletMap);
 
     // Linha de Trajetória
-    gpsPolyline = L.polyline([], {
+    gpsPolyline = LeafletObj.polyline([], {
       color: '#00d2ff',
       weight: 4,
       opacity: 0.85
     }).addTo(leafletMap);
 
     // Marcador do Veículo
-    const vehicleIcon = L.divIcon({
+    const vehicleIcon = LeafletObj.divIcon({
       className: 'vehicle-map-pin',
       html: '<div style="width:16px;height:16px;background:#00e676;border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 10px #00e676;"></div>',
       iconSize: [16, 16],
       iconAnchor: [8, 8]
     });
-    gpsMarker = L.marker(initialPos, { icon: vehicleIcon }).addTo(leafletMap);
+    gpsMarker = LeafletObj.marker(initialPos, { icon: vehicleIcon }).addTo(leafletMap);
 
     if (state.gpsLat != null && state.gpsLon != null) {
       gpsPolyline.addLatLng(initialPos);
     }
 
     isMapInitialized = true;
+    console.log('Mapa Leaflet inicializado com sucesso.');
+    setTimeout(() => {
+      if (leafletMap) leafletMap.invalidateSize();
+    }, 200);
   } catch (err) {
     console.error('Erro ao inicializar mapa Leaflet:', err);
   }
@@ -271,23 +278,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const state = {
     usbConnected: false,
     ecuResponding: false,
+    hasReceivedFuelFrame: false,
+    hasReceivedTorqueFrame: false,
     lastEcuRespMs: 0,
     lastRpmMs: 0,
     lastSpeedMs: 0,
     rpm: 0,
     speed: 0,
     gear: 'N',
-    map: 38,
-    throttle: 0.0,
-    engineLoad: 0.0,
-    timingAdvance: 3.0,
-    coolantTemp: 0,
-    intakeTemp: 30,
-    stft: 0.0,
-    ltft: 0.0,
-    fuelLevel: 49.0,
-    fuelLiters: 26.5,
-    batteryVoltage: 12.5,
+    map: null,
+    throttle: null,
+    engineLoad: null,
+    timingAdvance: null,
+    coolantTemp: null,
+    intakeTemp: null,
+    stft: null,
+    ltft: null,
+    fuelLevel: null,
+    fuelLiters: null,
+    batteryVoltage: null,
     engineTorqueNm: 0.0,
     milOn: false,
     dtcCount: 0,
@@ -417,7 +426,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabMap = document.getElementById('tab-map');
     const isMapVisible = tabMap && tabMap.classList.contains('active');
 
-    if (!isMapInitialized && window.L && isMapVisible) {
+    const LeafletObj = window.L || window.leaflet;
+    if (!isMapInitialized && LeafletObj && isMapVisible) {
       initLeafletMap();
     }
 
@@ -455,6 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Broadcast 0x430: Nível Real da Boia do Tanque (Byte 0 / 2.55)
     if (canId === 0x430 && bytes.length >= 1) {
+      state.hasReceivedFuelFrame = true;
       state.fuelLevel = Math.round((bytes[0] / 2.55) * 10) / 10;
       state.fuelLiters = Math.round((state.fuelLevel / 100.0) * 54.0 * 10) / 10;
       return;
@@ -462,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Broadcast 0x422: Demanda do Pedal e Torque Real do Motor
     if (canId === 0x422 && bytes.length >= 1) {
+      state.hasReceivedTorqueFrame = true;
       const b0 = bytes[0];
       state.engineTorqueNm = b0 > 0 ? Math.round((8.0 + 85.0 * (b0 / 255.0)) * 10) / 10 : (state.rpm > 400 ? 8.0 : 0.0);
       return;
@@ -582,22 +594,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const rpmStale = (now - state.lastRpmMs) > 1500;
     const speedStale = (now - state.lastSpeedMs) > 1500;
     state.ecuResponding = (now - state.lastEcuRespMs) <= 2000;
+    const isEcuActive = state.ecuResponding;
 
-    const curRpm = rpmStale ? 0 : state.rpm;
-    const curSpd = speedStale ? 0 : state.speed;
+    const curRpm = (isEcuActive && !rpmStale) ? state.rpm : 0;
+    const curSpd = (isEcuActive && !speedStale) ? state.speed : 0;
 
-    state.gear = detectGear(curRpm, curSpd);
-    state.batteryVoltage = curRpm > 450 ? 14.2 : 12.5;
+    state.gear = isEcuActive ? detectGear(curRpm, curSpd) : 'N';
+    state.batteryVoltage = isEcuActive ? (curRpm > 450 ? 14.2 : 12.5) : null;
 
-    const sd = calcSpeedDensity(curRpm, state.map, state.intakeTemp, curSpd, state.stft, state.ltft);
-    state.fuelRateLph = sd.lph;
-    state.fuelEcoStr = sd.str;
-    state.fuelEcoUnit = sd.unit;
+    if (isEcuActive && state.map != null && curRpm > 350) {
+      const iat = state.intakeTemp != null ? state.intakeTemp : 30;
+      const st = state.stft != null ? state.stft : 0.0;
+      const lt = state.ltft != null ? state.ltft : 0.0;
+      const sd = calcSpeedDensity(curRpm, state.map, iat, curSpd, st, lt);
+      state.fuelRateLph = sd.lph;
+      state.fuelEcoStr = sd.str;
+      state.fuelEcoUnit = sd.unit;
+    } else {
+      state.fuelRateLph = 0.0;
+      state.fuelEcoStr = '--';
+      state.fuelEcoUnit = 'km/L';
+    }
 
-    if (!speedStale && curSpd > 0) {
+    if (isEcuActive && !speedStale && curSpd > 0) {
       state.tripKm += (curSpd / 3600.0) * dtSec;
     }
-    if (!rpmStale && curRpm > 350) {
+    if (isEcuActive && !rpmStale && curRpm > 350) {
       state.totalFuelLiters += (state.fuelRateLph / 3600.0) * dtSec;
     }
 
@@ -606,7 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
       : 0.0;
     const tripTimeStr = formatDuration((now - state.sessionStartMs) / 1000.0);
 
-    // Grava linha no Datalogger se ativo (10 Hz)
+    // Grava linha no Datalogger se ativo (10 Hz) com proteção de nulos
     if (isLogging) {
       if (curSpd > logMaxSpeed) logMaxSpeed = curSpd;
       const iso = new Date(now);
@@ -617,17 +639,17 @@ document.addEventListener('DOMContentLoaded', () => {
         curRpm,
         curSpd,
         state.gear,
-        state.throttle.toFixed(1),
-        state.engineLoad.toFixed(1),
-        state.map,
-        state.coolantTemp,
-        state.intakeTemp,
-        state.timingAdvance.toFixed(1),
-        state.stft.toFixed(1),
-        state.ltft.toFixed(1),
-        state.fuelLevel.toFixed(1),
-        state.fuelLiters.toFixed(1),
-        state.batteryVoltage.toFixed(2),
+        state.throttle != null ? state.throttle.toFixed(1) : '0.0',
+        state.engineLoad != null ? state.engineLoad.toFixed(1) : '',
+        state.map != null ? state.map : '',
+        state.coolantTemp != null ? state.coolantTemp : '',
+        state.intakeTemp != null ? state.intakeTemp : '',
+        state.timingAdvance != null ? state.timingAdvance.toFixed(1) : '',
+        state.stft != null ? state.stft.toFixed(1) : '',
+        state.ltft != null ? state.ltft.toFixed(1) : '',
+        state.fuelLevel != null ? state.fuelLevel.toFixed(1) : '',
+        state.fuelLiters != null ? state.fuelLiters.toFixed(1) : '',
+        state.batteryVoltage != null ? state.batteryVoltage.toFixed(2) : '',
         state.fuelRateLph.toFixed(2),
         `${state.fuelEcoStr} ${state.fuelEcoUnit}`,
         state.totalFuelLiters.toFixed(4),
@@ -658,7 +680,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Atualiza MIL
     if (elMilBadge && elMilIcon && elMilText) {
-      if (state.milOn || state.dtcCount > 0) {
+      if (isEcuActive && (state.milOn || state.dtcCount > 0)) {
         elMilBadge.className = 'mil-badge mil-alert';
         elMilIcon.textContent = '⚠️';
         elMilText.textContent = `DTC: ${state.dtcCount}`;
@@ -671,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Atualiza Barra Fita Superior de Shift Light / RPM
     if (elTachoBarFill) {
-      const pct = Math.min(100, Math.max(0, (curRpm / 6000.0) * 100));
+      const pct = (isEcuActive && curRpm > 0) ? Math.min(100, Math.max(0, (curRpm / 6000.0) * 100)) : 0;
       elTachoBarFill.style.width = `${pct}%`;
       if (curRpm >= 5500) {
         elTachoBarFill.style.background = 'linear-gradient(90deg, #ffb300, #ff1744)';
@@ -683,13 +705,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Velocidade, RPM e Marcha Digitais
-    if (elRpmVal) elRpmVal.textContent = curRpm.toLocaleString();
-    if (elSpeedVal) elSpeedVal.textContent = curSpd;
+    if (elRpmVal) elRpmVal.textContent = isEcuActive ? curRpm.toLocaleString() : '0';
+    if (elSpeedVal) elSpeedVal.textContent = isEcuActive ? curSpd : '0';
     if (elGearVal) {
       elGearVal.textContent = state.gear;
       elGearVal.style.color = state.gear === 'N' ? '#829ab1' : '#00d2ff';
     }
-    if (elConsumptionVal) elConsumptionVal.textContent = state.fuelEcoStr;
+    if (elConsumptionVal) elConsumptionVal.textContent = isEcuActive ? state.fuelEcoStr : '--';
     if (elConsumptionUnit) elConsumptionUnit.textContent = state.fuelEcoUnit;
     if (elTripKm) elTripKm.textContent = `${state.tripKm.toFixed(1)} km`;
     if (elTripTime) elTripTime.textContent = tripTimeStr;
@@ -697,69 +719,142 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elTripAvg) elTripAvg.textContent = `${avgKml.toFixed(1)} km/L`;
 
     // Atualiza Velocidade ECU no HUD do Mapa
-    if (elHudEcuSpeed) elHudEcuSpeed.textContent = `${curSpd} km/h`;
+    if (elHudEcuSpeed) elHudEcuSpeed.textContent = isEcuActive ? `${curSpd} km/h` : '-- km/h';
 
     // Sensores Grid 3x3
     // Card 1: Temp ECT
-    if (elCoolantVal) elCoolantVal.textContent = state.coolantTemp > 0 ? state.coolantTemp : '--';
-    if (elCoolantProgress) elCoolantProgress.style.width = `${Math.min(100, Math.max(0, ((state.coolantTemp - 40) / 80) * 100))}%`;
+    if (elCoolantVal) {
+      elCoolantVal.textContent = (isEcuActive && state.coolantTemp != null) ? state.coolantTemp : '--';
+    }
+    if (elCoolantProgress) {
+      elCoolantProgress.style.width = (isEcuActive && state.coolantTemp != null)
+        ? `${Math.min(100, Math.max(0, ((state.coolantTemp - 40) / 80) * 100))}%`
+        : '0%';
+    }
 
     // Card 2: Torque Motor (ESTIMADO)
-    if (elTorqueVal) elTorqueVal.textContent = state.engineTorqueNm.toFixed(0);
-    if (elTorqueProgress) elTorqueProgress.style.width = `${Math.min(100, Math.max(0, (state.engineTorqueNm / 93.0) * 100))}%`;
+    const showTorque = (isEcuActive || state.hasReceivedTorqueFrame) && curRpm > 400;
+    if (elTorqueVal) elTorqueVal.textContent = showTorque ? state.engineTorqueNm.toFixed(0) : '0';
+    if (elTorqueProgress) {
+      elTorqueProgress.style.width = showTorque
+        ? `${Math.min(100, Math.max(0, (state.engineTorqueNm / 93.0) * 100))}%`
+        : '0%';
+    }
     if (elTorqueSub) {
       const kgfm = (state.engineTorqueNm / 9.80665).toFixed(1);
-      elTorqueSub.textContent = `${kgfm} kgfm • Máx: 93 Nm`;
+      elTorqueSub.textContent = showTorque ? `${kgfm} kgfm • Máx: 93 Nm` : '0.0 kgfm • Máx: 93 Nm';
     }
 
     // Card 3: MAP
-    if (elMapVal) elMapVal.textContent = state.map;
-    if (elMapProgress) elMapProgress.style.width = `${Math.min(100, Math.max(0, (state.map / 105) * 100))}%`;
+    if (elMapVal) {
+      elMapVal.textContent = (isEcuActive && state.map != null) ? state.map : '--';
+    }
+    if (elMapProgress) {
+      elMapProgress.style.width = (isEcuActive && state.map != null)
+        ? `${Math.min(100, Math.max(0, (state.map / 105) * 100))}%`
+        : '0%';
+    }
 
     // Card 4: Demanda / Pedal TPS
-    if (elThrottleVal) elThrottleVal.textContent = state.throttle.toFixed(0);
-    if (elThrottleProgress) elThrottleProgress.style.width = `${state.throttle}%`;
-
-    // Card 5: Combustível Real
-    const isReserve = state.fuelLiters <= 5.0;
-    if (elFuelVal) {
-      elFuelVal.textContent = state.fuelLevel.toFixed(0);
-      elFuelVal.style.color = isReserve ? '#ff3366' : 'var(--text-primary)';
+    if (elThrottleVal) {
+      elThrottleVal.textContent = (isEcuActive && state.throttle != null) ? state.throttle.toFixed(0) : '0';
     }
-    if (elFuelProgress) elFuelProgress.style.width = `${Math.min(100, Math.max(0, state.fuelLevel))}%`;
+    if (elThrottleProgress) {
+      elThrottleProgress.style.width = (isEcuActive && state.throttle != null) ? `${state.throttle}%` : '0%';
+    }
+
+    // Card 5: Combustível Real (Boia CAN 0x430)
+    const showFuel = state.hasReceivedFuelFrame && state.fuelLevel != null;
+    if (elFuelVal) {
+      if (showFuel) {
+        const isReserve = (state.fuelLiters != null && state.fuelLiters <= 5.0);
+        elFuelVal.textContent = state.fuelLevel.toFixed(0);
+        elFuelVal.style.color = isReserve ? '#ff3366' : 'var(--text-primary)';
+      } else {
+        elFuelVal.textContent = '--';
+        elFuelVal.style.color = 'var(--text-primary)';
+      }
+    }
+    if (elFuelProgress) {
+      elFuelProgress.style.width = showFuel ? `${Math.min(100, Math.max(0, state.fuelLevel))}%` : '0%';
+    }
     if (elFuelSub) {
-      const refKml = avgKml > 3.0 ? avgKml : 11.5;
-      const rangeKm = Math.round(state.fuelLiters * refKml);
-      elFuelSub.textContent = `${state.fuelLiters.toFixed(1)} L / 54L • Auton: ~${rangeKm} km`;
+      if (showFuel) {
+        const refKml = avgKml > 3.0 ? avgKml : 11.5;
+        const rangeKm = Math.round(state.fuelLiters * refKml);
+        elFuelSub.textContent = `${state.fuelLiters.toFixed(1)} L / 54L • Auton: ~${rangeKm} km`;
+      } else {
+        elFuelSub.textContent = '-- L / 54L • Auton: -- km';
+      }
     }
 
     // Card 6: Carga do Motor
-    if (elLoadVal) elLoadVal.textContent = state.engineLoad.toFixed(1);
-    if (elLoadProgress) elLoadProgress.style.width = `${Math.min(100, Math.max(0, state.engineLoad))}%`;
+    if (elLoadVal) {
+      elLoadVal.textContent = (isEcuActive && state.engineLoad != null) ? state.engineLoad.toFixed(1) : '--';
+    }
+    if (elLoadProgress) {
+      elLoadProgress.style.width = (isEcuActive && state.engineLoad != null)
+        ? `${Math.min(100, Math.max(0, state.engineLoad))}%`
+        : '0%';
+    }
 
     // Card 7: Ponto de Ignição
-    if (elTimingVal) elTimingVal.textContent = (state.timingAdvance >= 0 ? '+' : '') + state.timingAdvance.toFixed(1);
-    if (elTimingProgress) elTimingProgress.style.width = `${Math.min(100, Math.max(0, ((state.timingAdvance + 10) / 55) * 100))}%`;
+    if (elTimingVal) {
+      elTimingVal.textContent = (isEcuActive && state.timingAdvance != null)
+        ? ((state.timingAdvance >= 0 ? '+' : '') + state.timingAdvance.toFixed(1))
+        : '--';
+    }
+    if (elTimingProgress) {
+      elTimingProgress.style.width = (isEcuActive && state.timingAdvance != null)
+        ? `${Math.min(100, Math.max(0, ((state.timingAdvance + 10) / 55) * 100))}%`
+        : '0%';
+    }
 
     // Card 8: Sonda Lambda
-    if (elTrimSub) elTrimSub.textContent = `STFT: ${state.stft >= 0 ? '+' : ''}${state.stft.toFixed(1)}% • LTFT: ${state.ltft >= 0 ? '+' : ''}${state.ltft.toFixed(1)}%`;
-    if (elTrimStatus) {
-      if (Math.abs(state.stft) <= 5 && Math.abs(state.ltft) <= 5) {
-        elTrimStatus.textContent = 'ESTEQUIOM.';
-        elTrimStatus.style.color = '#00e676';
-      } else if (state.stft < -8 || state.ltft < -8) {
-        elTrimStatus.textContent = 'ENXUGANDO';
-        elTrimStatus.style.color = '#00d2ff';
-      } else {
-        elTrimStatus.textContent = 'NORMAL';
-        elTrimStatus.style.color = 'var(--text-primary)';
+    if (isEcuActive && state.stft != null) {
+      const lt = state.ltft != null ? state.ltft : 0.0;
+      if (elTrimSub) {
+        elTrimSub.textContent = `STFT: ${state.stft >= 0 ? '+' : ''}${state.stft.toFixed(1)}% • LTFT: ${lt >= 0 ? '+' : ''}${lt.toFixed(1)}%`;
+      }
+      if (elTrimStatus) {
+        if (Math.abs(state.stft) <= 5 && Math.abs(lt) <= 5) {
+          elTrimStatus.textContent = 'ESTEQUIOM.';
+          elTrimStatus.style.color = '#00e676';
+        } else if (state.stft < -8 || lt < -8) {
+          elTrimStatus.textContent = 'ENXUGANDO';
+          elTrimStatus.style.color = '#00d2ff';
+        } else {
+          elTrimStatus.textContent = 'NORMAL';
+          elTrimStatus.style.color = 'var(--text-primary)';
+        }
+      }
+      if (elTrimProgress) {
+        elTrimProgress.style.width = `${Math.min(100, Math.max(0, ((state.stft + 25) / 50) * 100))}%`;
+      }
+    } else {
+      if (elTrimStatus) {
+        elTrimStatus.textContent = '--';
+        elTrimStatus.style.color = 'var(--text-secondary)';
+      }
+      if (elTrimSub) {
+        elTrimSub.textContent = 'STFT: --% • LTFT: --%';
+      }
+      if (elTrimProgress) {
+        elTrimProgress.style.width = '0%';
       }
     }
-    if (elTrimProgress) elTrimProgress.style.width = `${Math.min(100, Math.max(0, ((state.stft + 25) / 50) * 100))}%`;
 
     // Card 9: Tensão Bateria (ESTIMADO)
-    if (elBatteryVal) elBatteryVal.textContent = state.batteryVoltage.toFixed(1);
-    if (elBatteryProgress) elBatteryProgress.style.width = `${Math.min(100, Math.max(0, ((state.batteryVoltage - 10) / 5) * 100))}%`;
+    if (elBatteryVal) {
+      elBatteryVal.textContent = (isEcuActive && state.batteryVoltage != null)
+        ? state.batteryVoltage.toFixed(1)
+        : '--';
+    }
+    if (elBatteryProgress) {
+      elBatteryProgress.style.width = (isEcuActive && state.batteryVoltage != null)
+        ? `${Math.min(100, Math.max(0, ((state.batteryVoltage - 10) / 5) * 100))}%`
+        : '0%';
+    }
   }, 100);
 
   // 11. Controles de Gravação e Exportação de Logs CSV no Android
