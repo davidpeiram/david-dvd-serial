@@ -450,3 +450,18 @@ Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
      - Adicionado listener para evento 'resize' de janela (garantindo redesenho perfeito do mapa ao alternar entre retrato e paisagem no tablet/celular).
      - Centralização inteligente: o mapa nasce centralizado na localização real do GPS caso as coordenadas já tenham sido recebidas na aba do Cockpit.
   5. Atualização de versão: versionCode 24, versionName "2.3.1" (permite atualização direta in-place sem desinstalar).
+
+[ATUALIZAÇÃO CRÍTICA & RIGOR METROLÓGICO - RELEASE v2.3.2 (03/11/2026 - 23:25)]
+- Resolução de Bugs Relatados em Teste de Campo (Moto G24 Power):
+  1. Correção Crítica do Carregamento do Mapa Leaflet 4G:
+     - Causa raiz: A URL do provedor CartoDB Dark Matter continha o token '{r}' ('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'). O motor do Leaflet lança uma exceção 'Error: No value provided for variable r' quando nenhum valor é passado para {r}, interrompendo completamente a montagem das camadas, do marcador e da polilinha.
+     - Solução: URL corrigida para 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png' e fallback robusto 'window.L || window.leaflet'.
+     - Adicionado 'invalidateSize()' assíncrono garantindo renderização instantânea dos tiles em redes 4G/Wi-Fi.
+  2. Rigor Metrológico Estrito - Zero Valores Fantasmas com ECU Desconectada:
+     - Causa raiz: Valores estáticos de bancada (MAP 38 kPa, Ponto +3.0°, Nível 49%, Bateria 12.5V) permaneciam pré-carregados no estado inicial e no loop de renderização de 10 Hz enquanto a ECU não respondia ('AGUARDANDO ECU...').
+     - Solução: Todos os sensores iniciam como 'null'. Quando 'state.ecuResponding' for falso, todos os 9 cards exibem '--' (ou '0' para grandezas analógicas zeradas) com barras de progresso em 0%.
+     - Exibição de combustível real apenas quando o frame de boia CAN 0x430 for recebido do painel; caso contrário, exibe '-- L / 54L • Auton: -- km'.
+     - O tacômetro, velocidade, marcha e consumo instantâneo permanecem rigorosamente zerados/nulos até o handshake com a injeção EEC-VI.
+  3. Preservação Histórica Obrigatória de APKs:
+     - Arquivamento individual versionado em 'apk/Fiesta_Cockpit_USB_v2.3.2.apk' mantendo também o link universal 'apk/Fiesta_Cockpit_USB.apk'.
+  4. Versão: versionCode 25, versionName "2.3.2".
