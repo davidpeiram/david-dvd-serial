@@ -1,7 +1,7 @@
 /**
  * app_mobile.js - Motor Nativo de Telemetria OBD-II / HS-CAN para Android (CANable V2.1)
  * Ford Fiesta Sedan 1.0 Zetec Rocam Flex (ECU Ford EEC-VI • 500 kbps)
- * Versão v2.3.2 - Cluster Digital Compacto, Correção Mapa GPS e Rigor Metrológico
+ * Versão v2.3.3 - Cluster Digital Compacto, Correção de Escopo do Mapa Leaflet e Logo Oficial
  */
 
 // Funções Globais Disponíveis no Escopo de Janela
@@ -9,6 +9,48 @@ let leafletMap = null;
 let gpsMarker = null;
 let gpsPolyline = null;
 let isMapInitialized = false;
+
+// Estado Central de Telemetria (Escopo Global Acessível por Todo o App)
+const state = {
+  usbConnected: false,
+  ecuResponding: false,
+  hasReceivedFuelFrame: false,
+  hasReceivedTorqueFrame: false,
+  lastEcuRespMs: 0,
+  lastRpmMs: 0,
+  lastSpeedMs: 0,
+  rpm: 0,
+  speed: 0,
+  gear: 'N',
+  map: null,
+  throttle: null,
+  engineLoad: null,
+  timingAdvance: null,
+  coolantTemp: null,
+  intakeTemp: null,
+  stft: null,
+  ltft: null,
+  fuelLevel: null,
+  fuelLiters: null,
+  batteryVoltage: null,
+  engineTorqueNm: 0.0,
+  milOn: false,
+  dtcCount: 0,
+  fuelRateLph: 0.0,
+  fuelEcoStr: '--',
+  fuelEcoUnit: 'km/L',
+  tripKm: 0.0,
+  totalFuelLiters: 0.0,
+  sessionStartMs: Date.now(),
+  lastCalcMs: Date.now(),
+  gpsLat: null,
+  gpsLon: null,
+  gpsSpeed: 0.0,
+  gpsAlt: 0.0,
+  gpsBearing: 0.0,
+  gpsAcc: 999.0,
+  firstGpsFix: false
+};
 
 window.switchAppTab = function(tabName) {
   const tabCockpit = document.getElementById('tab-cockpit');
@@ -23,12 +65,13 @@ window.switchAppTab = function(tabName) {
     if (btnMap) btnMap.classList.add('active');
 
     const LeafletObj = window.L || window.leaflet;
-    if (!isMapInitialized && LeafletObj) {
+    if (!leafletMap && LeafletObj) {
       initLeafletMap();
     }
-    setTimeout(() => {
-      if (leafletMap) leafletMap.invalidateSize();
-    }, 150);
+    // Múltiplos invalidateSize garantem que o WebView redesenhe os tiles nas novas dimensões
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 60);
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 500);
   } else {
     if (tabMap) tabMap.classList.remove('active');
     if (tabCockpit) tabCockpit.classList.add('active');
@@ -84,20 +127,27 @@ function initLeafletMap() {
   if (!container || !LeafletObj || leafletMap) return;
 
   try {
-    // Coordenadas iniciais: última posição conhecida do GPS ou Região RJ / Niterói (-22.9068, -43.1729)
-    const initialPos = (state.gpsLat != null && state.gpsLon != null)
-      ? [state.gpsLat, state.gpsLon]
-      : [-22.9068, -43.1729];
+    // Coordenadas iniciais seguras: última posição conhecida do GPS ou Rio / Niterói (-22.9068, -43.1729)
+    const lat = (typeof state !== 'undefined' && state && state.gpsLat != null) ? state.gpsLat : -22.9068;
+    const lon = (typeof state !== 'undefined' && state && state.gpsLon != null) ? state.gpsLon : -43.1729;
+    const initialPos = [lat, lon];
 
     leafletMap = LeafletObj.map('leaflet-map', {
       zoomControl: true,
       attributionControl: false
     }).setView(initialPos, 16);
 
-    // Tiles CartoDB Dark Matter (Estilo Cockpit Noturno) - sem token {r} para evitar exceção no Leaflet
+    // Tiles CartoDB Dark Matter com fallback automático para OpenStreetMap
     const tileLayer = LeafletObj.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
       maxZoom: 19,
       subdomains: 'abcd'
+    });
+    tileLayer.on('tileerror', function(err) {
+      console.warn('Erro ao carregar tile de mapa CartoDB, acionando fallback OSM:', err);
+      if (!tileLayer._osmFallbackDone) {
+        tileLayer._osmFallbackDone = true;
+        tileLayer.setUrl('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+      }
     });
     tileLayer.addTo(leafletMap);
 
@@ -117,15 +167,15 @@ function initLeafletMap() {
     });
     gpsMarker = LeafletObj.marker(initialPos, { icon: vehicleIcon }).addTo(leafletMap);
 
-    if (state.gpsLat != null && state.gpsLon != null) {
+    if (typeof state !== 'undefined' && state && state.gpsLat != null && state.gpsLon != null) {
       gpsPolyline.addLatLng(initialPos);
     }
 
     isMapInitialized = true;
-    console.log('Mapa Leaflet inicializado com sucesso.');
-    setTimeout(() => {
-      if (leafletMap) leafletMap.invalidateSize();
-    }, 200);
+    console.log('Mapa Leaflet inicializado com sucesso em:', initialPos);
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 80);
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 300);
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 600);
   } catch (err) {
     console.error('Erro ao inicializar mapa Leaflet:', err);
   }
@@ -274,47 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 5. Estado Central de Telemetria
-  const state = {
-    usbConnected: false,
-    ecuResponding: false,
-    hasReceivedFuelFrame: false,
-    hasReceivedTorqueFrame: false,
-    lastEcuRespMs: 0,
-    lastRpmMs: 0,
-    lastSpeedMs: 0,
-    rpm: 0,
-    speed: 0,
-    gear: 'N',
-    map: null,
-    throttle: null,
-    engineLoad: null,
-    timingAdvance: null,
-    coolantTemp: null,
-    intakeTemp: null,
-    stft: null,
-    ltft: null,
-    fuelLevel: null,
-    fuelLiters: null,
-    batteryVoltage: null,
-    engineTorqueNm: 0.0,
-    milOn: false,
-    dtcCount: 0,
-    fuelRateLph: 0.0,
-    fuelEcoStr: '--',
-    fuelEcoUnit: 'km/L',
-    tripKm: 0.0,
-    totalFuelLiters: 0.0,
-    sessionStartMs: Date.now(),
-    lastCalcMs: Date.now(),
-    gpsLat: null,
-    gpsLon: null,
-    gpsSpeed: 0.0,
-    gpsAlt: 0.0,
-    gpsBearing: 0.0,
-    gpsAcc: 999.0,
-    firstGpsFix: false
-  };
+  // 5. Estado Central de Telemetria (Definido globalmente no topo do arquivo)
 
   // 6. Terminal SLCAN & Métodos de Depuração
   const modalTerminal = document.getElementById('modal-terminal');

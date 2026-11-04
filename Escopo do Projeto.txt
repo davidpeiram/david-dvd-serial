@@ -465,3 +465,22 @@ Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
   3. Preservação Histórica Obrigatória de APKs:
      - Arquivamento individual versionado em 'apk/Fiesta_Cockpit_USB_v2.3.2.apk' mantendo também o link universal 'apk/Fiesta_Cockpit_USB.apk'.
   4. Versão: versionCode 25, versionName "2.3.2".
+
+
+[ATUALIZAÇÃO CRÍTICA & IDENTIDADE VISUAL - RELEASE v2.3.3 (03/11/2026 - 23:45)]
+- Resolução Definitiva do Bloqueio de Inicialização do Mapa Leaflet:
+  1. Correção Crítica de Escopo Lexical do Objeto 'state':
+     - Causa raiz: A função 'initLeafletMap()' foi declarada no escopo global (linha 81), mas tentava acessar 'state.gpsLat'. O objeto 'state' estava declarado como constante interna da função anônima de 'DOMContentLoaded' (linha 278). Ao trocar para a aba '🗺️ Mapa GPS', o JavaScript lançava um 'ReferenceError: state is not defined', abortando a criação do mapa Leaflet e mantendo o container em tela preta.
+     - Solução: O objeto central 'state' foi promovido para o escopo global no topo de 'app_mobile.js', e 'initLeafletMap()' recebeu blindagem condicional ('typeof state !== "undefined" && state.gpsLat != null ? state.gpsLat : -22.9068').
+  2. Fallback Automático de Tiles (CartoDB -> OpenStreetMap) & Multi-Invalidate:
+     - Adicionado listener 'tileerror' na camada CartoDB Dark Matter com chaveamento automático para 'tile.openstreetmap.org' caso os servidores do CartoDB estejam lentos ou bloqueados no 4G das operadoras móveis.
+     - Encadeados múltiplos 'invalidateSize()' assíncronos (60ms, 200ms, 500ms) ao trocar de aba, forçando o motor WebView a recalcular a geometria útil mesmo após rotação ou abertura lenta de abas.
+     - Adicionado 'min-height: 400px' aos containers '#map-container-wrap' e '#leaflet-map' no CSS.
+  3. Desbloqueio de Recursos Externos no WebView do Android:
+     - Adicionados 'settings.setAllowUniversalAccessFromFileURLs(true)', 'settings.setAllowFileAccessFromFileURLs(true)' e 'settings.setBlockNetworkImage(false)' em 'MainActivity.java', garantindo que o Chromium do Android nunca bloqueie download de tiles externos a partir de páginas com esquema local 'file:///android_asset/'.
+  4. Capa e Identidade Visual Oficial do APK (Ícone do Aplicativo):
+     - Processada a logo gerada em 'Fotos/Logo/' (Ford Fiesta Sedan prata, chicote OBD-II 16 pinos e telemetria automotiva neon).
+     - Gerados ícones mipmap em todas as densidades Android (mdpi 48px, hdpi 72px, xhdpi 96px, xxhdpi 144px, xxxhdpi 192px e drawable 512px) tanto em versão squircle com cantos transparentes quanto redonda ('ic_launcher_round.png').
+     - Configuradas as propriedades 'android:icon="@mipmap/ic_launcher"' e 'android:roundIcon="@mipmap/ic_launcher_round"' em 'AndroidManifest.xml'.
+     - Integrado ícone como favicon e insígnia na barra superior ('brand-section') do Cockpit.
+  5. Versão: versionCode 26, versionName "2.3.3".
