@@ -297,12 +297,16 @@ class OBDManager:
         effective_kml = avg_kml if (avg_kml > 5.0 and self.trip_km > 2.0) else 11.5
         self.telemetry["range_km"] = int(fuel_liters * effective_kml)
 
-        # 9. Torque Real do Motor (Engenharia Reversa Ford: Broadcast 0x422 em Nm)
+        # 9. Torque Estimado do Motor (ID 0x422 com Carga A/C) e Demanda do Condutor
         cur_rpm = self.telemetry.get("rpm", 0)
         if cur_rpm > 400:
             self.telemetry["engine_torque_nm"] = round(float(self.adapter.get_engine_torque_nm()), 1)
         else:
             self.telemetry["engine_torque_nm"] = 0.0
+
+        self.telemetry["driver_demand_pct"] = round(float(getattr(self.adapter, "engine_load_pct", 0.0)), 1)
+        self.telemetry["ac_engaged"] = bool(getattr(self.adapter, "ac_clutch_engaged", False))
+        self.telemetry["ac_pressure_bar"] = float(getattr(self.adapter, "ac_pressure_bar", 0.0))
 
         # 10. Status Geral da Conexão
         self.telemetry["connection_info"] = self.adapter.connection_info

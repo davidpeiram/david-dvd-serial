@@ -148,23 +148,23 @@
         </div>
       </div>
 
-      <!-- Sensor 2: Tensão da Bateria (Estimada) -->
+      <!-- Sensor 2: Torque Estimado do Motor (ID 0x422) -->
       <div class="sensor-card">
         <div class="card-top">
-          <span class="card-title">Tensão Bateria</span>
+          <span class="card-title">Torque Motor</span>
           <div class="card-tags">
             <span class="tag-meta tag-est">ESTIMADO</span>
-            <span class="card-icon">⚡</span>
+            <span class="card-icon">⚙️</span>
           </div>
         </div>
         <div class="card-num-box">
-          <span id="val-battery" class="card-num">--</span>
-          <span class="card-unit">V</span>
+          <span id="val-torque" class="card-num">0</span>
+          <span class="card-unit">Nm</span>
         </div>
         <div class="progress-bg">
-          <div id="progress-battery" class="progress-fill"></div>
+          <div id="progress-torque" class="progress-fill" style="width: 0%;"></div>
         </div>
-        <div class="card-sub" style="color: #ffb300;">Aprox. por RPM • Sem ADC Físico</div>
+        <div id="val-torque-sub" class="card-sub">0.0 kgfm • Máx: 93 Nm</div>
       </div>
 
       <!-- Sensor 3: Pressão MAP (Carga do Motor) -->
@@ -185,10 +185,10 @@
         </div>
       </div>
 
-      <!-- Sensor 4: Posição da Borboleta (TPS) -->
+      <!-- Sensor 4: Demanda do Motorista / Pedal (TPS) -->
       <div class="sensor-card">
         <div class="card-top">
-          <span class="card-title">Borboleta (TPS)</span>
+          <span class="card-title">Demanda / Pedal</span>
           <div class="card-tags">
             <span class="tag-meta tag-real">REAL</span>
             <span class="card-icon">🎯</span>
@@ -201,6 +201,7 @@
         <div class="progress-bg">
           <div id="progress-throttle" class="progress-fill"></div>
         </div>
+        <div class="card-sub">Acelerador Físico (0x422)</div>
       </div>
 
       <!-- Sensor 5: Nível Real do Tanque de Combustível (ID 0x430) -->
@@ -279,23 +280,23 @@
         <div id="val-trim-sub" class="card-sub">STFT: --% • LTFT: --%</div>
       </div>
 
-      <!-- Sensor 9: Torque Instantâneo do Motor (ID 0x422) -->
+      <!-- Sensor 9: Tensão da Bateria (Estimada) -->
       <div class="sensor-card">
         <div class="card-top">
-          <span class="card-title">Torque Motor</span>
+          <span class="card-title">Tensão Bateria</span>
           <div class="card-tags">
-            <span class="tag-meta tag-real">REAL</span>
-            <span class="card-icon">⚙️</span>
+            <span class="tag-meta tag-est">ESTIMADO</span>
+            <span class="card-icon">⚡</span>
           </div>
         </div>
         <div class="card-num-box">
-          <span id="val-torque" class="card-num">0</span>
-          <span class="card-unit">Nm</span>
+          <span id="val-battery" class="card-num">--</span>
+          <span class="card-unit">V</span>
         </div>
         <div class="progress-bg">
-          <div id="progress-torque" class="progress-fill" style="width: 0%;"></div>
+          <div id="progress-battery" class="progress-fill"></div>
         </div>
-        <div id="val-torque-sub" class="card-sub">Máx Rocam: 93 Nm (73 cv)</div>
+        <div class="card-sub" style="color: #ffb300;">Aprox. por RPM • Sem ADC Físico</div>
       </div>
 
     </section>

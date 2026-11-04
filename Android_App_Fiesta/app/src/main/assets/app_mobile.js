@@ -1,34 +1,130 @@
 /**
  * app_mobile.js - Motor Nativo de Telemetria OBD-II / HS-CAN para Android (CANable V2.1)
  * Ford Fiesta Sedan 1.0 Zetec Rocam Flex (ECU Ford EEC-VI • 500 kbps)
+ * Versão v2.3 - Cluster Digital Compacto, GPS Sob Demanda e 5 Temas
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-  // 1. Seletor de Temas com Persistência
-  const themeSelect = document.getElementById('theme-switcher');
-  const savedTheme = localStorage.getItem('html_manual_theme') || localStorage.getItem('html_estudos_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  if (themeSelect) {
-    themeSelect.value = savedTheme;
-    themeSelect.addEventListener('change', (e) => {
-      const val = e.target.value;
-      document.documentElement.setAttribute('data-theme', val);
-      localStorage.setItem('html_manual_theme', val);
-      localStorage.setItem('html_estudos_theme', val);
-    });
+// Funções Globais Disponíveis no Escopo de Janela
+let leafletMap = null;
+let gpsMarker = null;
+let gpsPolyline = null;
+let isMapInitialized = false;
+
+window.switchAppTab = function(tabName) {
+  const tabCockpit = document.getElementById('tab-cockpit');
+  const tabMap = document.getElementById('tab-map');
+  const btnCockpit = document.getElementById('tab-btn-cockpit');
+  const btnMap = document.getElementById('tab-btn-map');
+
+  if (tabName === 'map') {
+    if (tabCockpit) tabCockpit.classList.remove('active');
+    if (tabMap) tabMap.classList.add('active');
+    if (btnCockpit) btnCockpit.classList.remove('active');
+    if (btnMap) btnMap.classList.add('active');
+
+    if (!isMapInitialized && window.L) {
+      initLeafletMap();
+    }
+    setTimeout(() => {
+      if (leafletMap) leafletMap.invalidateSize();
+    }, 150);
+  } else {
+    if (tabMap) tabMap.classList.remove('active');
+    if (tabCockpit) tabCockpit.classList.add('active');
+    if (btnMap) btnMap.classList.remove('active');
+    if (btnCockpit) btnCockpit.classList.add('active');
+  }
+};
+
+window.changeTheme = function(themeName) {
+  document.documentElement.setAttribute('data-theme', themeName);
+  try {
+    localStorage.setItem('fiesta_cockpit_theme', themeName);
+    localStorage.setItem('html_manual_theme', themeName);
+    localStorage.setItem('html_estudos_theme', themeName);
+  } catch (e) {}
+  const sel = document.getElementById('theme-switcher');
+  if (sel) sel.value = themeName;
+};
+
+window.toggleGpsTracking = function() {
+  const btn = document.getElementById('btn-toggle-gps');
+  let active = false;
+  if (window.AndroidUSB && window.AndroidUSB.isGpsActive) {
+    active = window.AndroidUSB.isGpsActive();
   }
 
-  // 2. Mostradores Circulares (Canvas)
-  const rpmGauge = new CircularGauge('gauge-rpm-canvas', {
-    min: 0, max: 7000, redline: 6000, step: 1000, labelDivider: 1000, unit: 'RPM x1000',
-  });
-  const speedGauge = new CircularGauge('gauge-speed-canvas', {
-    min: 0, max: 200, redline: 160, step: 20, labelDivider: 1, unit: 'km/h',
-  });
+  if (active) {
+    if (window.AndroidUSB && window.AndroidUSB.stopGps) {
+      window.AndroidUSB.stopGps();
+    }
+    if (btn) {
+      btn.textContent = '📍 GPS OFF';
+      btn.classList.remove('active');
+      btn.style.borderColor = 'var(--border-color)';
+      btn.style.color = 'var(--text-secondary)';
+    }
+  } else {
+    if (window.AndroidUSB && window.AndroidUSB.startGps) {
+      window.AndroidUSB.startGps();
+    }
+    if (btn) {
+      btn.textContent = '📍 GPS ON';
+      btn.classList.add('active');
+      btn.style.borderColor = 'var(--accent-cyan)';
+      btn.style.color = 'var(--accent-cyan)';
+    }
+  }
+};
 
-  // 3. Referências de UI
+function initLeafletMap() {
+  const container = document.getElementById('leaflet-map');
+  if (!container || !window.L || leafletMap) return;
+
+  try {
+    // Coordenadas iniciais: Região Metropolitana RJ / UFF Niterói (-22.9068, -43.1729)
+    leafletMap = L.map('leaflet-map', {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([-22.9068, -43.1729], 15);
+
+    // Tiles CartoDB Dark Matter (Estilo Cockpit Noturno)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(leafletMap);
+
+    // Linha de Trajetória
+    gpsPolyline = L.polyline([], {
+      color: '#00d2ff',
+      weight: 4,
+      opacity: 0.85
+    }).addTo(leafletMap);
+
+    // Marcador do Veículo
+    const vehicleIcon = L.divIcon({
+      className: 'vehicle-map-pin',
+      html: '<div style="width:16px;height:16px;background:#00e676;border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 10px #00e676;"></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+    gpsMarker = L.marker([-22.9068, -43.1729], { icon: vehicleIcon }).addTo(leafletMap);
+
+    isMapInitialized = true;
+  } catch (err) {
+    console.error('Erro ao inicializar mapa Leaflet:', err);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // 1. Inicialização de Tema
+  const savedTheme = localStorage.getItem('fiesta_cockpit_theme') ||
+                     localStorage.getItem('html_manual_theme') ||
+                     localStorage.getItem('html_estudos_theme') || 'dark';
+  window.changeTheme(savedTheme);
+
+  // 2. Elementos de Interface
   const elClock = document.getElementById('live-clock');
-  const elAcBadge = document.getElementById('ac-badge');
   const elConnBadge = document.getElementById('conn-info-badge');
   const elMilBadge = document.getElementById('mil-badge');
   const elMilIcon = document.getElementById('mil-icon');
@@ -37,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const elStatusText = document.getElementById('status-text');
   const btnFullscreen = document.getElementById('btn-fullscreen');
 
+  const elTachoBarFill = document.getElementById('tacho-bar-fill');
   const elRpmVal = document.getElementById('val-rpm');
   const elSpeedVal = document.getElementById('val-speed');
   const elGearVal = document.getElementById('val-gear');
@@ -45,13 +142,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const elTripKm = document.getElementById('val-trip-km');
   const elTripTime = document.getElementById('val-trip-time');
   const elTripFuel = document.getElementById('val-trip-fuel');
-  const elTripCost = document.getElementById('val-trip-cost');
   const elTripAvg = document.getElementById('val-trip-avg');
 
   const elCoolantVal = document.getElementById('val-coolant');
   const elCoolantProgress = document.getElementById('progress-coolant');
-  const elBatteryVal = document.getElementById('val-battery');
-  const elBatteryProgress = document.getElementById('progress-battery');
+  const elTorqueVal = document.getElementById('val-torque');
+  const elTorqueProgress = document.getElementById('progress-torque');
+  const elTorqueSub = document.getElementById('val-torque-sub');
   const elMapVal = document.getElementById('val-map');
   const elMapProgress = document.getElementById('progress-map');
   const elThrottleVal = document.getElementById('val-throttle');
@@ -66,11 +163,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const elTrimStatus = document.getElementById('val-trim-status');
   const elTrimProgress = document.getElementById('progress-trim');
   const elTrimSub = document.getElementById('val-trim-sub');
-  const elTorqueVal = document.getElementById('val-torque');
-  const elTorqueProgress = document.getElementById('progress-torque');
-  const elTorqueSub = document.getElementById('val-torque-sub');
+  const elBatteryVal = document.getElementById('val-battery');
+  const elBatteryProgress = document.getElementById('progress-battery');
 
-  // Relógio
+  // Elementos do HUD do Mapa GPS
+  const elHudGpsSpeed = document.getElementById('hud-gps-speed');
+  const elHudEcuSpeed = document.getElementById('hud-ecu-speed');
+  const elHudGpsAlt = document.getElementById('hud-gps-alt');
+  const elHudGpsAcc = document.getElementById('hud-gps-acc');
+  const elHudGpsCoords = document.getElementById('hud-gps-coords');
+
+  // Relógio Top Bar
   setInterval(() => {
     const now = new Date();
     if (elClock) elClock.textContent = now.toTimeString().slice(0, 8);
@@ -88,11 +191,11 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         document.exitFullscreen().catch(() => {});
       }
-      btnFullscreen.textContent = isFull ? '🗗 Normal' : '⛶ Cheia';
+      btnFullscreen.textContent = isFull ? '🗗' : '⛶';
     });
   }
 
-  // 4. Detector de Marchas Calibrado (Câmbio Ford IB5 1.0 Flex - Pneus 175/65 R14)
+  // 3. Detector de Marchas Calibrado (Câmbio Ford IB5 1.0 Flex - Pneus 175/65 R14)
   const GEAR_RATIO_RANGES = [
     [1, 130.0, 240.0], // 1ª Marcha (centro ~175)
     [2, 80.0, 129.9],  // 2ª Marcha (centro ~101)
@@ -135,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return currentStableGear;
   }
 
-  // 5. Cálculo de Consumo Speed-Density V2.0 (Com compensação STFT + LTFT)
+  // 4. Cálculo de Consumo Speed-Density V2.0 (Com compensação STFT + LTFT)
   function calcSpeedDensity(rpm, mapKpa, iatC, speedKmh, stft, ltft) {
     if (rpm < 350) return { lph: 0.0, kml: null, str: '0.0', unit: 'L/h' };
     const iatK = Math.max(240.0, iatC + 273.15);
@@ -156,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 6. Estado Central de Telemetria
+  // 5. Estado Central de Telemetria
   const state = {
     usbConnected: false,
     ecuResponding: false,
@@ -178,11 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
     fuelLiters: 26.5,
     batteryVoltage: 12.5,
     engineTorqueNm: 0.0,
-    acClutch: false,
-    acPressureBar: 0.0,
     milOn: false,
     dtcCount: 0,
-    dtcCodes: [],
     fuelRateLph: 0.0,
     fuelEcoStr: '--',
     fuelEcoUnit: 'km/L',
@@ -190,9 +290,16 @@ document.addEventListener('DOMContentLoaded', () => {
     totalFuelLiters: 0.0,
     sessionStartMs: Date.now(),
     lastCalcMs: Date.now(),
+    gpsLat: null,
+    gpsLon: null,
+    gpsSpeed: 0.0,
+    gpsAlt: 0.0,
+    gpsBearing: 0.0,
+    gpsAcc: 999.0,
+    firstGpsFix: false
   };
 
-  // 7. Terminal Modal & Log
+  // 6. Terminal SLCAN & Métodos de Depuração
   const modalTerminal = document.getElementById('modal-terminal');
   const termLog = document.getElementById('terminal-log');
   const btnOpenTerminal = document.getElementById('btn-open-terminal');
@@ -205,8 +312,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const t = new Date().toTimeString().slice(0, 8);
     div.textContent = `[${t}] ${msg}`;
     termLog.appendChild(div);
-    if (termLog.children.length > 150) termLog.removeChild(termLog.firstChild);
+    if (termLog.children.length > 120) termLog.removeChild(termLog.firstChild);
     termLog.scrollTop = termLog.scrollHeight;
+  }
+
+  window.termSend = function(cmd) {
+    appendTermLog(`TX -> ${cmd}`, 'term-tx');
+    if (window.AndroidUSB && window.AndroidUSB.sendCommand) {
+      window.AndroidUSB.sendCommand(cmd);
+    }
+  };
+
+  window.clearTermLog = function() {
+    if (termLog) termLog.innerHTML = '';
+  };
+
+  function sendSlcan(cmd, logIt = false) {
+    if (logIt) appendTermLog(`TX -> ${cmd}`, 'term-tx');
+    if (window.AndroidUSB && window.AndroidUSB.sendCommand) {
+      window.AndroidUSB.sendCommand(cmd);
+    }
   }
 
   if (btnOpenTerminal) {
@@ -220,44 +345,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function sendSlcan(cmd, logIt = false) {
-    if (logIt) appendTermLog(`TX -> ${cmd}`, 'term-tx');
-    if (window.AndroidUSB && window.AndroidUSB.sendCommand) {
-      window.AndroidUSB.sendCommand(cmd);
-    }
-  }
-
-  document.getElementById('btn-term-connect')?.addEventListener('click', () => {
-    appendTermLog('Solicitando conexão USB ao Android...', 'term-info');
-    if (window.AndroidUSB) window.AndroidUSB.connect();
-  });
-  document.getElementById('btn-term-ver')?.addEventListener('click', () => sendSlcan('V', true));
-  document.getElementById('btn-term-init500')?.addEventListener('click', () => {
-    sendSlcan('C', true);
-    setTimeout(() => sendSlcan('S6', true), 40);
-    setTimeout(() => sendSlcan('O', true), 80);
-  });
-  document.getElementById('btn-term-dtc')?.addEventListener('click', () => {
-    sendSlcan('t7E0801030000000000', true);
-  });
-  document.getElementById('btn-term-clear')?.addEventListener('click', () => {
-    if (termLog) termLog.innerHTML = '';
-  });
-  document.getElementById('btn-term-send')?.addEventListener('click', () => {
-    const inp = document.getElementById('term-custom-input');
-    if (inp && inp.value.trim()) {
-      sendSlcan(inp.value.trim(), true);
-      inp.value = '';
-    }
-  });
-
   if (elConnBadge) {
     elConnBadge.addEventListener('click', () => {
       if (window.AndroidUSB) window.AndroidUSB.connect();
     });
   }
 
-  // 8. Recepção de Eventos Nativos do Android (Java -> JS)
+  // 7. Recepção de Eventos Nativos do Android (Java -> JS)
   window.onNativeUsbStatus = (status, message) => {
     appendTermLog(`USB [${status}]: ${message}`, status === 'ERROR' ? 'term-err' : 'term-info');
     if (status === 'CONNECTED') {
@@ -270,6 +364,37 @@ document.addEventListener('DOMContentLoaded', () => {
       state.ecuResponding = false;
       if (elStatusDot) elStatusDot.className = 'status-dot offline';
       if (elStatusText) elStatusText.textContent = 'USB DESCONECTADO';
+    }
+  };
+
+  // Callback de GPS Nativo
+  window.onNativeGpsUpdate = (lat, lon, speedKmh, alt, bearing, acc) => {
+    state.gpsLat = lat;
+    state.gpsLon = lon;
+    state.gpsSpeed = speedKmh;
+    state.gpsAlt = alt;
+    state.gpsBearing = bearing;
+    state.gpsAcc = acc;
+
+    if (elHudGpsSpeed) elHudGpsSpeed.textContent = `${speedKmh.toFixed(1)} km/h`;
+    if (elHudGpsCoords) elHudGpsCoords.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    if (elHudGpsAlt) elHudGpsAlt.textContent = `${alt.toFixed(0)} m`;
+    if (elHudGpsAcc) elHudGpsAcc.textContent = `±${acc.toFixed(0)} m`;
+
+    if (!isMapInitialized && window.L) {
+      initLeafletMap();
+    }
+
+    if (leafletMap && gpsMarker && gpsPolyline) {
+      const pos = [lat, lon];
+      gpsMarker.setLatLng(pos);
+      gpsPolyline.addLatLng(pos);
+      if (!state.firstGpsFix) {
+        state.firstGpsFix = true;
+        leafletMap.setView(pos, 16);
+      } else {
+        leafletMap.panTo(pos, { animate: true });
+      }
     }
   };
 
@@ -299,18 +424,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // 2. Broadcast 0x422: Torque Real do Motor (Byte 0) e Ar-Condicionado (Bytes 5 e 6)
+    // 2. Broadcast 0x422: Demanda do Pedal e Torque Real do Motor
     if (canId === 0x422 && bytes.length >= 1) {
       const b0 = bytes[0];
       state.engineTorqueNm = b0 > 0 ? Math.round((8.0 + 85.0 * (b0 / 255.0)) * 10) / 10 : (state.rpm > 400 ? 8.0 : 0.0);
-      if (bytes.length >= 7) {
-        state.acClutch = (bytes[5] === 0x48) || ((bytes[5] & 0x08) !== 0);
-        state.acPressureBar = bytes[6];
-      }
       return;
     }
 
-    // 3. Resposta de Diagnóstico da ECU do Motor Ford EEC-VI (0x7E8)
+    // 3. Resposta de Diagnóstico da ECU Ford EEC-VI (0x7E8)
     if (canId === 0x7E8 && bytes.length >= 3) {
       state.ecuResponding = true;
       state.lastEcuRespMs = now;
@@ -365,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // 9. Scheduler de Requisições OBD-II (Prioridades 1, 2 e 3 em 0x7E0)
+  // 8. Scheduler de Requisições OBD-II (Prioridades 1, 2 e 3 em 0x7E0)
   const p1Pids = [0x0C, 0x0D, 0x11];
   const p2Pids = [0x04, 0x0B, 0x0E];
   const p3Pids = [0x05, 0x0F, 0x06, 0x07, 0x01];
@@ -378,7 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let pidToQuery;
     const mod = pollStep % 5;
     if (mod < 3) {
-      pidToQuery = p1Pids[mod]; // RPM, Speed, TPS com máxima frequência
+      pidToQuery = p1Pids[mod]; // RPM, Speed, TPS com alta taxa (15+ Hz)
     } else if (mod === 3) {
       pidToQuery = p2Pids[p2Idx % p2Pids.length];
       p2Idx++;
@@ -391,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendSlcan(`t7E080201${pidHex}00000000`, false);
   }, 42);
 
-  // 10. Datalogger CSV (25 Colunas idênticas ao PC)
+  // 9. Datalogger CSV (27 Colunas com GPS Lat/Lon)
   let isLogging = false;
   let currentLogRows = [];
   let currentLogName = '';
@@ -406,7 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'timing_advance_deg', 'stft_pct', 'ltft_pct', 'fuel_level_pct',
     'fuel_liters_tank', 'battery_voltage_v', 'fuel_rate_lph', 'fuel_economy_str',
     'trip_fuel_liters', 'trip_km', 'avg_kml', 'mil_on', 'dtc_count',
-    'ecu_responding', 'engine_torque_nm'
+    'ecu_responding', 'engine_torque_nm', 'gps_lat', 'gps_lon'
   ];
 
   function formatDuration(sec) {
@@ -416,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${h}:${m}:${s}`;
   }
 
-  // Loop de Integração Física, Watchdog e Renderização (10 Hz)
+  // 10. Loop de Integração Física, Watchdog e Renderização (10 Hz)
   setInterval(() => {
     const now = Date.now();
     const dtSec = Math.min(1.0, Math.max(0.001, (now - state.lastCalcMs) / 1000.0));
@@ -447,9 +568,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const avgKml = state.totalFuelLiters > 0.005
       ? Math.min(99.9, state.tripKm / state.totalFuelLiters)
       : 0.0;
-    const tripCost = state.totalFuelLiters * 6.30;
-    const refKml = avgKml > 3.0 ? avgKml : 11.5;
-    const rangeKm = Math.round(state.fuelLiters * refKml);
     const tripTimeStr = formatDuration((now - state.sessionStartMs) / 1000.0);
 
     // Grava linha no Datalogger se ativo (10 Hz)
@@ -482,11 +600,13 @@ document.addEventListener('DOMContentLoaded', () => {
         state.milOn,
         state.dtcCount,
         state.ecuResponding,
-        state.engineTorqueNm.toFixed(1)
+        state.engineTorqueNm.toFixed(1),
+        state.gpsLat != null ? state.gpsLat.toFixed(6) : '',
+        state.gpsLon != null ? state.gpsLon.toFixed(6) : ''
       ].join(','));
     }
 
-    // Atualiza UI
+    // Atualiza Status de Conexão
     if (elStatusDot && elStatusText) {
       if (state.ecuResponding) {
         elStatusDot.className = 'status-dot online';
@@ -500,22 +620,33 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (elAcBadge) {
-      if (state.acClutch) {
-        elAcBadge.textContent = `❄️ A/C ON (${state.acPressureBar} Bar)`;
-        elAcBadge.style.background = 'rgba(0, 230, 118, 0.16)';
-        elAcBadge.style.color = '#00e676';
-        elAcBadge.style.borderColor = 'rgba(0, 230, 118, 0.4)';
+    // Atualiza MIL
+    if (elMilBadge && elMilIcon && elMilText) {
+      if (state.milOn || state.dtcCount > 0) {
+        elMilBadge.className = 'mil-badge mil-alert';
+        elMilIcon.textContent = '⚠️';
+        elMilText.textContent = `DTC: ${state.dtcCount}`;
       } else {
-        elAcBadge.textContent = '❄️ A/C OFF';
-        elAcBadge.style.background = 'rgba(148,163,184,0.12)';
-        elAcBadge.style.color = '#94a3b8';
-        elAcBadge.style.borderColor = 'rgba(148,163,184,0.25)';
+        elMilBadge.className = 'mil-badge mil-ok';
+        elMilIcon.textContent = '✅';
+        elMilText.textContent = 'OK';
       }
     }
 
-    rpmGauge.setValue(curRpm);
-    speedGauge.setValue(curSpd);
+    // Atualiza Barra Fita Superior de Shift Light / RPM
+    if (elTachoBarFill) {
+      const pct = Math.min(100, Math.max(0, (curRpm / 6000.0) * 100));
+      elTachoBarFill.style.width = `${pct}%`;
+      if (curRpm >= 5500) {
+        elTachoBarFill.style.background = 'linear-gradient(90deg, #ffb300, #ff1744)';
+      } else if (curRpm >= 4000) {
+        elTachoBarFill.style.background = 'linear-gradient(90deg, #00d2ff, #ffb300)';
+      } else {
+        elTachoBarFill.style.background = 'linear-gradient(90deg, #00d2ff, #00e676)';
+      }
+    }
+
+    // Velocidade, RPM e Marcha Digitais
     if (elRpmVal) elRpmVal.textContent = curRpm.toLocaleString();
     if (elSpeedVal) elSpeedVal.textContent = curSpd;
     if (elGearVal) {
@@ -527,35 +658,54 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elTripKm) elTripKm.textContent = `${state.tripKm.toFixed(1)} km`;
     if (elTripTime) elTripTime.textContent = tripTimeStr;
     if (elTripFuel) elTripFuel.textContent = `${state.totalFuelLiters.toFixed(2)} L`;
-    if (elTripCost) elTripCost.textContent = `R$ ${tripCost.toFixed(2).replace('.', ',')}`;
     if (elTripAvg) elTripAvg.textContent = `${avgKml.toFixed(1)} km/L`;
 
-    if (elCoolantVal) elCoolantVal.textContent = state.coolantTemp;
+    // Atualiza Velocidade ECU no HUD do Mapa
+    if (elHudEcuSpeed) elHudEcuSpeed.textContent = `${curSpd} km/h`;
+
+    // Sensores Grid 3x3
+    // Card 1: Temp ECT
+    if (elCoolantVal) elCoolantVal.textContent = state.coolantTemp > 0 ? state.coolantTemp : '--';
     if (elCoolantProgress) elCoolantProgress.style.width = `${Math.min(100, Math.max(0, ((state.coolantTemp - 40) / 80) * 100))}%`;
 
-    if (elBatteryVal) elBatteryVal.textContent = state.batteryVoltage.toFixed(1);
-    if (elBatteryProgress) elBatteryProgress.style.width = `${Math.min(100, Math.max(0, ((state.batteryVoltage - 10) / 5) * 100))}%`;
+    // Card 2: Torque Motor (ESTIMADO)
+    if (elTorqueVal) elTorqueVal.textContent = state.engineTorqueNm.toFixed(0);
+    if (elTorqueProgress) elTorqueProgress.style.width = `${Math.min(100, Math.max(0, (state.engineTorqueNm / 93.0) * 100))}%`;
+    if (elTorqueSub) {
+      const kgfm = (state.engineTorqueNm / 9.80665).toFixed(1);
+      elTorqueSub.textContent = `${kgfm} kgfm • Máx: 93 Nm`;
+    }
 
+    // Card 3: MAP
     if (elMapVal) elMapVal.textContent = state.map;
     if (elMapProgress) elMapProgress.style.width = `${Math.min(100, Math.max(0, (state.map / 105) * 100))}%`;
 
+    // Card 4: Demanda / Pedal TPS
     if (elThrottleVal) elThrottleVal.textContent = state.throttle.toFixed(0);
     if (elThrottleProgress) elThrottleProgress.style.width = `${state.throttle}%`;
 
+    // Card 5: Combustível Real
     const isReserve = state.fuelLiters <= 5.0;
     if (elFuelVal) {
       elFuelVal.textContent = state.fuelLevel.toFixed(0);
-      elFuelVal.style.color = isReserve ? '#ff3366' : '#ffffff';
+      elFuelVal.style.color = isReserve ? '#ff3366' : 'var(--text-primary)';
     }
     if (elFuelProgress) elFuelProgress.style.width = `${Math.min(100, Math.max(0, state.fuelLevel))}%`;
-    if (elFuelSub) elFuelSub.textContent = `${state.fuelLiters.toFixed(1)} L / 54L • Auton: ~${rangeKm} km (Est.)`;
+    if (elFuelSub) {
+      const refKml = avgKml > 3.0 ? avgKml : 11.5;
+      const rangeKm = Math.round(state.fuelLiters * refKml);
+      elFuelSub.textContent = `${state.fuelLiters.toFixed(1)} L / 54L • Auton: ~${rangeKm} km`;
+    }
 
+    // Card 6: Carga do Motor
     if (elLoadVal) elLoadVal.textContent = state.engineLoad.toFixed(1);
     if (elLoadProgress) elLoadProgress.style.width = `${Math.min(100, Math.max(0, state.engineLoad))}%`;
 
+    // Card 7: Ponto de Ignição
     if (elTimingVal) elTimingVal.textContent = (state.timingAdvance >= 0 ? '+' : '') + state.timingAdvance.toFixed(1);
     if (elTimingProgress) elTimingProgress.style.width = `${Math.min(100, Math.max(0, ((state.timingAdvance + 10) / 55) * 100))}%`;
 
+    // Card 8: Sonda Lambda
     if (elTrimSub) elTrimSub.textContent = `STFT: ${state.stft >= 0 ? '+' : ''}${state.stft.toFixed(1)}% • LTFT: ${state.ltft >= 0 ? '+' : ''}${state.ltft.toFixed(1)}%`;
     if (elTrimStatus) {
       if (Math.abs(state.stft) <= 5 && Math.abs(state.ltft) <= 5) {
@@ -566,17 +716,14 @@ document.addEventListener('DOMContentLoaded', () => {
         elTrimStatus.style.color = '#00d2ff';
       } else {
         elTrimStatus.textContent = 'NORMAL';
-        elTrimStatus.style.color = '#ffffff';
+        elTrimStatus.style.color = 'var(--text-primary)';
       }
     }
     if (elTrimProgress) elTrimProgress.style.width = `${Math.min(100, Math.max(0, ((state.stft + 25) / 50) * 100))}%`;
 
-    if (elTorqueVal) elTorqueVal.textContent = state.engineTorqueNm.toFixed(0);
-    if (elTorqueProgress) elTorqueProgress.style.width = `${Math.min(100, Math.max(0, (state.engineTorqueNm / 93.0) * 100))}%`;
-    if (elTorqueSub) {
-      const kgfm = (state.engineTorqueNm / 9.80665).toFixed(1);
-      elTorqueSub.textContent = `${kgfm} kgfm • Máx 93 Nm (73 cv)`;
-    }
+    // Card 9: Tensão Bateria (ESTIMADO)
+    if (elBatteryVal) elBatteryVal.textContent = state.batteryVoltage.toFixed(1);
+    if (elBatteryProgress) elBatteryProgress.style.width = `${Math.min(100, Math.max(0, ((state.batteryVoltage - 10) / 5) * 100))}%`;
   }, 100);
 
   // 11. Controles de Gravação e Exportação de Logs CSV no Android
@@ -639,15 +786,14 @@ document.addEventListener('DOMContentLoaded', () => {
         logMaxSpeed = 0;
         isLogging = true;
         btnToggleLog.classList.add('recording');
-        if (btnLogText) btnLogText.textContent = 'PARAR LOG';
+        if (btnLogText) btnLogText.textContent = '■ PARAR LOG';
       } else {
         isLogging = false;
         btnToggleLog.classList.remove('recording');
-        if (btnLogText) btnLogText.textContent = 'GRAVAR LOG';
+        if (btnLogText) btnLogText.textContent = '● GRAVAR LOG';
 
         const dist = Math.max(0, state.tripKm - logStartKm);
         const fuel = Math.max(0, state.totalFuelLiters - logStartFuel);
-        const cost = fuel * 6.30;
         const avg = fuel > 0.002 ? (dist / fuel) : 0.0;
         const durSec = Math.max(1, (Date.now() - logStartMs) / 1000.0);
         const avgSpd = (dist / (durSec / 3600.0));
@@ -656,12 +802,17 @@ document.addEventListener('DOMContentLoaded', () => {
         lastSavedCsvContent = currentLogRows.join('\n');
         saveStoredLog(lastSavedCsvFilename, lastSavedCsvContent, `${dist.toFixed(2)} km • ${currentLogRows.length - 1} amostras`);
 
-        document.getElementById('summary-distance').textContent = `${dist.toFixed(2)} km`;
-        document.getElementById('summary-fuel').textContent = `${fuel.toFixed(2)} L`;
-        document.getElementById('summary-cost').textContent = `R$ ${cost.toFixed(2).replace('.', ',')}`;
-        document.getElementById('summary-avg-kml').textContent = `${avg.toFixed(1)} km/L`;
-        document.getElementById('summary-duration').textContent = formatDuration(durSec);
-        document.getElementById('summary-speed').textContent = `${avgSpd.toFixed(1)} / ${logMaxSpeed} km/h`;
+        const sumDist = document.getElementById('summary-distance');
+        const sumFuel = document.getElementById('summary-fuel');
+        const sumAvg = document.getElementById('summary-avg-kml');
+        const sumDur = document.getElementById('summary-duration');
+        const sumSpd = document.getElementById('summary-speed');
+
+        if (sumDist) sumDist.textContent = `${dist.toFixed(2)} km`;
+        if (sumFuel) sumFuel.textContent = `${fuel.toFixed(2)} L`;
+        if (sumAvg) sumAvg.textContent = `${avg.toFixed(1)} km/L`;
+        if (sumDur) sumDur.textContent = formatDuration(durSec);
+        if (sumSpd) sumSpd.textContent = `${avgSpd.toFixed(1)} / ${logMaxSpeed} km/h`;
 
         if (modalSummary) modalSummary.classList.add('active');
       }
@@ -693,15 +844,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const list = getStoredLogs();
       if (container) {
         if (!list.length) {
-          container.innerHTML = '<div style="color: #94a3b8; text-align: center; padding: 20px;">Nenhuma viagem gravada ainda.<br>Toque em <b>GRAVAR LOG</b> antes de sair com o carro!</div>';
+          container.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 20px;">Nenhuma viagem gravada ainda.<br>Toque em <b>GRAVAR LOG</b> antes de sair com o carro!</div>';
         } else {
           container.innerHTML = list.map((item, idx) => `
-            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.35);border:1px solid var(--border-color);border-radius:8px;padding:8px 10px;margin-bottom:8px;">
               <div>
-                <div style="font-weight:700;font-size:12.5px;color:#f8fafc;">${item.filename}</div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${item.modified} • ${item.size_kb} KB • ${item.summary}</div>
+                <div style="font-weight:700;font-size:12px;color:var(--text-primary);">${item.filename}</div>
+                <div style="font-size:10.5px;color:var(--text-secondary);margin-top:2px;">${item.modified} • ${item.size_kb} KB • ${item.summary}</div>
               </div>
-              <button data-idx="${idx}" class="btn-export-item" style="background:linear-gradient(135deg,#2563eb,#00d2ff);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;">📤 Exportar</button>
+              <button data-idx="${idx}" class="btn-export-item" style="background:var(--accent-cyan);color:#000;border:none;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">📤 Exportar</button>
             </div>
           `).join('');
           container.querySelectorAll('.btn-export-item').forEach(btn => {

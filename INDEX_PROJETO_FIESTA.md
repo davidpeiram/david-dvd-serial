@@ -70,6 +70,7 @@ Projetos/Projeto Fiesta Zetec Rocam 1.0/
 │   └── test_bancada_canable.py     # Verificador de firmware e comunicação SLCAN
 │
 ├── ⚙️ CONFIGURAÇÕES E DOCUMENTOS CENTRAIS:
+│   ├── Relatorio_Desempenho_Consumo_Telemetria_HTML.html # Relatório executivo de esticadas de marcha, RPM e consumo térmico
 │   ├── config.json                 # Configurações de porta COM, baudrate (500k) e modo
 │   ├── requirements.txt            # Dependências Python (pyserial, fastapi, uvicorn, websockets)
 │   ├── .gitignore                  # Arquivos ignorados pelo controle de versão

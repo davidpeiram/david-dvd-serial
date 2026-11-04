@@ -1,5 +1,6 @@
 package com.fiesta.cockpit;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -7,12 +8,16 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,7 +36,10 @@ import android.widget.Toast;
 
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,6 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MainActivity extends Activity {
 
     private static final String ACTION_USB_PERMISSION = "com.fiesta.cockpit.USB_PERMISSION";
+    private static final int PERMISSION_REQ_CODE = 301;
 
     private WebView webView;
     private UsbManager usbManager;
@@ -49,6 +58,10 @@ public class MainActivity extends Activity {
     private final AtomicBoolean snifferMode = new AtomicBoolean(false);
     private Thread readThread;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    private LocationManager locationManager;
+    private LocationListener locationListener;
+    private final AtomicBoolean isGpsTracking = new AtomicBoolean(false);
 
     private final Map<String, Long> lastBroadcastSentMs = new ConcurrentHashMap<>();
 
@@ -79,6 +92,13 @@ public class MainActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        // Inicia o Foreground Service para evitar congelamento em segundo plano
+        startTelemetryForegroundService();
+
+        // Solicita permissões de GPS e Notificação no Android 6 a 14+
+        requestAppPermissions();
 
         webView = new WebView(this);
         setContentView(webView);
@@ -102,6 +122,8 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new AndroidUsbBridge(), "AndroidUSB");
         webView.loadUrl("file:///android_asset/index.html");
 
+        setupGpsListener();
+
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
@@ -114,6 +136,122 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void startTelemetryForegroundService() {
+        try {
+            Intent sIntent = new Intent(this, TelemetryService.class);
+            if (Build.VERSION.SDK_INT >= 26) {
+                startForegroundService(sIntent);
+            } else {
+                startService(sIntent);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void requestAppPermissions() {
+        if (Build.VERSION.SDK_INT >= 23) {
+            List<String> perms = new ArrayList<>();
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                perms.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            }
+            if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                perms.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+            }
+            if (Build.VERSION.SDK_INT >= 33) {
+                if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+                    perms.add("android.permission.POST_NOTIFICATIONS");
+                }
+            }
+            if (!perms.isEmpty()) {
+                requestPermissions(perms.toArray(new String[0]), PERMISSION_REQ_CODE);
+            }
+        }
+    }
+
+    private void setupGpsListener() {
+        locationListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location loc) {
+                if (loc == null || !isGpsTracking.get()) return;
+                double lat = loc.getLatitude();
+                double lon = loc.getLongitude();
+                double alt = loc.hasAltitude() ? loc.getAltitude() : 0.0;
+                float spdKmh = loc.hasSpeed() ? (loc.getSpeed() * 3.6f) : 0.0f;
+                float bearing = loc.hasBearing() ? loc.getBearing() : 0.0f;
+                float acc = loc.hasAccuracy() ? loc.getAccuracy() : 999.0f;
+                dispatchGpsToJs(lat, lon, spdKmh, alt, bearing, acc);
+            }
+
+            @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
+            @Override public void onProviderEnabled(String provider) {}
+            @Override public void onProviderDisabled(String provider) {}
+        };
+    }
+
+    private synchronized void startGpsInternal() {
+        if (locationManager == null || isGpsTracking.get()) return;
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSION_REQ_CODE);
+                return;
+            }
+        }
+        try {
+            isGpsTracking.set(true);
+            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                        LocationManager.GPS_PROVIDER,
+                        1000L,
+                        0.5f,
+                        locationListener,
+                        Looper.getMainLooper()
+                );
+            } else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                        LocationManager.NETWORK_PROVIDER,
+                        1500L,
+                        1.0f,
+                        locationListener,
+                        Looper.getMainLooper()
+                );
+            }
+
+            Location lastLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (lastLoc == null) {
+                lastLoc = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            }
+            if (lastLoc != null) {
+                dispatchGpsToJs(
+                        lastLoc.getLatitude(),
+                        lastLoc.getLongitude(),
+                        lastLoc.hasSpeed() ? (lastLoc.getSpeed() * 3.6f) : 0.0f,
+                        lastLoc.hasAltitude() ? lastLoc.getAltitude() : 0.0,
+                        lastLoc.hasBearing() ? lastLoc.getBearing() : 0.0f,
+                        lastLoc.hasAccuracy() ? lastLoc.getAccuracy() : 999.0f
+                );
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private synchronized void stopGpsInternal() {
+        isGpsTracking.set(false);
+        if (locationManager != null && locationListener != null) {
+            try {
+                locationManager.removeUpdates(locationListener);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void dispatchGpsToJs(double lat, double lon, float speedKmh, double alt, float bearing, float acc) {
+        final String js = String.format(
+                Locale.US,
+                "if(window.onNativeGpsUpdate) window.onNativeGpsUpdate(%.6f, %.6f, %.1f, %.1f, %.1f, %.1f);",
+                lat, lon, speedKmh, alt, bearing, acc
+        );
+        mainHandler.post(() -> {
+            if (webView != null) webView.evaluateJavascript(js, null);
+        });
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -124,9 +262,13 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        stopGpsInternal();
         closeSerial();
         try {
             unregisterReceiver(usbReceiver);
+        } catch (Exception ignored) {}
+        try {
+            stopService(new Intent(this, TelemetryService.class));
         } catch (Exception ignored) {}
         super.onDestroy();
     }
@@ -306,13 +448,13 @@ public class MainActivity extends Activity {
             String idHex = line.substring(1, 4).toUpperCase();
             long now = System.currentTimeMillis();
 
-            // Respostas de diagnóstico OBD-II / UDS (0x7E8, 0x728, 0x72E) passam sem latência!
+            // Respostas de diagnóstico OBD-II / UDS passam sem latência
             if (idHex.startsWith("7")) {
                 dispatchFrameToJs(line);
                 return;
             }
 
-            // Frame 0x422 (Torque Real + Ar-Condicionado): throttle de 80ms (~12.5 Hz)
+            // Frame 0x422 (Demanda de Aceleração do Pedal): throttle de 80ms (~12.5 Hz)
             if ("422".equals(idHex)) {
                 Long last = lastBroadcastSentMs.get("422");
                 if (last == null || (now - last) >= 80) {
@@ -422,6 +564,21 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void setSnifferMode(boolean enabled) {
             snifferMode.set(enabled);
+        }
+
+        @JavascriptInterface
+        public void startGps() {
+            mainHandler.post(() -> startGpsInternal());
+        }
+
+        @JavascriptInterface
+        public void stopGps() {
+            mainHandler.post(() -> stopGpsInternal());
+        }
+
+        @JavascriptInterface
+        public boolean isGpsActive() {
+            return isGpsTracking.get();
         }
 
         @JavascriptInterface

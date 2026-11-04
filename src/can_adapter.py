@@ -251,17 +251,22 @@ class CANableSLCANAdapter(BaseCANAdapter):
             elif can_id == 0x422 and len(payload) >= 1:
                 b0 = payload[0]
                 self.engine_load_pct = round((b0 / 255.0) * 100.0, 1)
-                if b0 > 0:
-                    self.engine_torque_nm = round(8.0 + (85.0 * (b0 / 255.0)), 1)
-                else:
-                    self.engine_torque_nm = 8.0
-                self.last_torque_timestamp = time.time()
 
                 if len(payload) >= 7:
                     b5 = payload[5]
                     b6 = payload[6]
                     self.ac_clutch_engaged = bool(b5 == 0x48 or (b5 & 0x08))
                     self.ac_pressure_bar = float(b6)
+
+                # Compensação mecânica da embreagem do compressor do Ar-Condicionado (~10 Nm de carga parasita)
+                ac_extra_nm = 10.0 if self.ac_clutch_engaged else 0.0
+
+                if b0 > 0:
+                    # Escala linear somando demanda do pedal e arrasto do A/C
+                    self.engine_torque_nm = round(8.0 + ac_extra_nm + (75.0 * (b0 / 255.0)), 1)
+                else:
+                    self.engine_torque_nm = round(8.0 + ac_extra_nm, 1)
+                self.last_torque_timestamp = time.time()
 
             return can_id, payload
         except Exception:

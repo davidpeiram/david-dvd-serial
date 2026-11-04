@@ -338,8 +338,11 @@ document.addEventListener('DOMContentLoaded', () => {
     elMapVal.textContent = mapVal;
     elMapProgress.style.width = `${Math.min(100, Math.max(0, (mapVal / 105) * 100))}%`;
 
-    // Torque Real do Motor (Engenharia Reversa Ford ID 0x422 Byte 6 em Nm)
+    // Torque Estimado do Motor (ID 0x422 em Nm com carga do A/C)
     const torque = Number(data.engine_torque_nm) || 0;
+    const acEngaged = Boolean(data.ac_engaged);
+    const demand = Number(data.driver_demand_pct !== undefined ? data.driver_demand_pct : (data.throttle || 0));
+
     if (elTorqueVal) {
       elTorqueVal.textContent = torque.toFixed(0);
       if (torque > 75) {
@@ -360,13 +363,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (elTorqueSub) {
       const kgfm = (torque / 9.80665).toFixed(1);
-      elTorqueSub.textContent = `${kgfm} kgfm • Máx 93 Nm (73 cv)`;
+      elTorqueSub.textContent = ${kgfm} kgfm • Pedal: % • Máx: 93 Nm;
     }
 
-    // Borboleta (TPS)
-    const throttle = data.throttle || 0;
+    // Demanda do Motorista / Borboleta (TPS) [REAL]
+    const throttle = (data.driver_demand_pct !== undefined && data.driver_demand_pct > 0) ? data.driver_demand_pct : (data.throttle || 0);
     elThrottleVal.textContent = throttle.toFixed(0);
-    elThrottleProgress.style.width = `${throttle}%`;
+    elThrottleProgress.style.width = `${Math.min(100, Math.max(0, throttle))}%`;
 
     // Combustível Real da Boia (ID 0x430) e Autonomia
     const fuel = data.fuel_level !== undefined ? data.fuel_level : 49.0;

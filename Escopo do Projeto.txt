@@ -386,3 +386,53 @@ Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
     - Cockpit Digital completo com seletores de tema, mostradores Canvas (RPM e Velocidade), Marcha IB5 1.0 Flex calibrada, Consumo Speed-Density V2.0 (STFT/LTFT), Computador de Viagem, 9 Cards de sensores ([REAL] e [ESTIMADO]) e Modal de Terminal/Diagnóstico SLCAN embutido.
   * Compilação Automatizada em Nuvem (.github/workflows/build_android_apk.yml):
     - Pipeline GitHub Actions configurado para compilar o APK com JDK 17 + Android SDK + Gradle 8.5 e publicar automaticamente o instalador em 'apk/Fiesta_Cockpit_USB.apk', com botão de download direto no topo de Teste_WebUSB_CANable.html.
+
+
+[DEMANDA DE TELEMETRIA - COMPORTAMENTO DO TORQUE MOTOR COM IGNIÇÃO LIGADA E MOTOR DESLIGADO (03/11/2026 - 20:36)]
+- Relato do Usuário (via Inbox Celular): Ao ligar a ignição do carro e pressionar o pedal do acelerador com o motor desligado (veículo parado), o valor de torque no Cockpit aumentou dinamicamente.
+- Diagnóstico da Causa-Raiz:
+  * No barramento Ford High-Speed CAN, o frame de broadcast espontâneo 0x422 Byte 0 representa a 'Demanda Instantânea de Carga / Posição do Pedal do Acelerador' (Driver Demand / Throttle Request), variando de 0x00 (sem pisar) até 0xF4 (pé no fundo).
+  * A fórmula implementada em can_adapter.py e app_mobile.js realizava o cálculo direto: engine_torque_nm = 8.0 + (85.0 * (b0 / 255.0)) sem condicionar à rotação mínima do motor (RPM > 400).
+  * Como a chave de ignição estava ligada na posição II (alimentando sensores e CAN) mas o motor de combustão estava desligado (RPM = 0), a ECU transmitia a variação do pedal no Byte 0, induzindo o mostrador de torque a subir como se houvesse produção de força motriz no virabrequim.
+  * Rigor Metrológico Aplicado (AGENTS.md): Um motor parado (RPM < 400) produz estritamente 0.0 Nm de torque efetivo. Além disso, o Byte 0 do frame 0x422 deve ser reconhecido primordialmente como 'Demanda de Carga do Condutor (%)' e só estimado/convertido em Torque Indicado quando houver regime efetivo de combustão ativa.
+
+
+[RELATÓRIO TÉCNICO DE DESEMPENHO E CONSUMO GERADO (03/11/2026 - 21:45)]
+- Criado o relatório executivo 'Relatorio_Desempenho_Consumo_Telemetria_HTML.html' na pasta principal do projeto.
+- Conclusões do Diagnóstico:
+  * Esticadas intencionais (>= 3.000 RPM até 4.957 RPM em 2ª marcha com pé no fundo): Vazão média de 9,06 L/h (pico de 18,58 L/h), consumindo 2,97x mais combustível por hora do que o cruzeiro suave.
+  * Sweet Spot de Eficiência: 58,0% do tempo em movimento foi passado entre 1.500 e 2.000 RPM (média instantânea de 16,43 km/L com 2,97 L/h de vazão).
+  * Marchas Dominantes: 4ª marcha sustentou a maior parte da condução urbana (3.813 amostras a 20,1 km/L médio) e a 5ª marcha entregou 26,9 km/L instantâneo em trechos desimpedidos.
+  * Padrão HTML responsivo com seletor de 5 temas (dark, light, campbell, monokai, cyberpunk), sumário retrátil e persistência em localStorage.
+
+
+[VERSÃO v2.3 DO APLICATIVO NATIVO ANDROID - FIESTA COCKPIT USB (03/11/2026 - 22:30)]
+- Atualização para Release v2.3 (versionCode 23, versionName "2.3.0"):
+  1. Serviço em Primeiro Plano & Resiliência a Segundo Plano (Background Resilience):
+     - Criado 'TelemetryService.java' com 'FOREGROUND_SERVICE', 'PARTIAL_WAKE_LOCK' e notificação persistente no Android 8 a 14+.
+     - Elimina interrupções e congelamentos de gravação ao minimizar o aplicativo ou desligar a tela (solução para o salto de 184 segundos diagnosticado no Log 3).
+  2. Cluster Digital Compacto & Ergonômico (Otimização Moto G24 Power & Lenovo Tab M11):
+     - Remoção dos mostradores analógicos circulares (Canvas) na visualização de smartphone, recuperando ~260px de altura útil.
+     - Nova barra digital de Cockpit com fita graduada de Shift Light (RPM), Velocímetro digital, visor gigante de marcha IB5 e chips compactos de viagem.
+     - A grade de 9 cards de sensores cabe perfeitamente na tela do Moto G24 Power sem necessidade de rolagem vertical.
+     - Suporte adaptativo via media queries para tablets (Lenovo Tab M11) em alta resolução.
+  3. Correção Completa dos 5 Temas Visuais:
+     - Definidas todas as variáveis CSS nos seletores 'html[data-theme="..."]' em 'dashboard.css' para: dark, light, campbell, monokai e cyberpunk.
+     - Persistência das preferências via 'localStorage' ('fiesta_cockpit_theme').
+  4. Remoção Temporária de Indicadores de Ar-Condicionado (A/C):
+     - Removidos badges e referências de A/C da interface e cálculos de torque até validação futura via requisições diretas de DIDs Ford UDS (Service 22).
+  5. Sincronização e Reordenação da Grade de Sensores:
+     - Card 1: Temp. Motor ECT [REAL]
+     - Card 2: Torque Motor [ESTIMADO] (destaque no topo superior)
+     - Card 3: Pressão MAP [REAL]
+     - Card 4: Demanda / Pedal TPS [REAL] (Acelerador físico 0x422)
+     - Card 5: Combustível Real [REAL] (Boia 0x430)
+     - Card 6: Carga do Motor [REAL]
+     - Card 7: Ponto Ignição [REAL]
+     - Card 8: Sonda Lambda / Trims [REAL]
+     - Card 9: Tensão Bateria [ESTIMADO]
+  6. Rastreamento GPS Nativo Sob Demanda & Mapa 4G (Leaflet.js):
+     - Navegação por abas ('🏎️ Cockpit' e '🗺️ Mapa GPS').
+     - Botão de ativação sob demanda '📍 GPS ON/OFF' para evitar drenagem de bateria do smartphone (que já alimenta o CANable via USB OTG).
+     - Integração do mapa Leaflet com tiles CartoDB Dark Matter em 4G, exibindo marcador de posição, rastro em tempo real e HUD com velocidade de satélite vs. ECU.
+     - Adição das colunas 'gps_lat' e 'gps_lon' ao datalogger CSV de 27 colunas.
