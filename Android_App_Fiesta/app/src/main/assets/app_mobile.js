@@ -82,11 +82,15 @@ function initLeafletMap() {
   if (!container || !window.L || leafletMap) return;
 
   try {
-    // Coordenadas iniciais: Região Metropolitana RJ / UFF Niterói (-22.9068, -43.1729)
+    // Coordenadas iniciais: última posição conhecida do GPS ou Região RJ / Niterói (-22.9068, -43.1729)
+    const initialPos = (state.gpsLat != null && state.gpsLon != null)
+      ? [state.gpsLat, state.gpsLon]
+      : [-22.9068, -43.1729];
+
     leafletMap = L.map('leaflet-map', {
       zoomControl: true,
       attributionControl: false
-    }).setView([-22.9068, -43.1729], 15);
+    }).setView(initialPos, 16);
 
     // Tiles CartoDB Dark Matter (Estilo Cockpit Noturno)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -108,7 +112,11 @@ function initLeafletMap() {
       iconSize: [16, 16],
       iconAnchor: [8, 8]
     });
-    gpsMarker = L.marker([-22.9068, -43.1729], { icon: vehicleIcon }).addTo(leafletMap);
+    gpsMarker = L.marker(initialPos, { icon: vehicleIcon }).addTo(leafletMap);
+
+    if (state.gpsLat != null && state.gpsLon != null) {
+      gpsPolyline.addLatLng(initialPos);
+    }
 
     isMapInitialized = true;
   } catch (err) {
@@ -367,6 +375,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Callback de Status de GPS Nativo
+  window.onNativeGpsStatusChanged = (active) => {
+    state.gpsActive = Boolean(active);
+    const btn = document.getElementById('btn-toggle-gps');
+    if (btn) {
+      btn.textContent = active ? '📍 GPS ON' : '📍 GPS OFF';
+      if (active) {
+        btn.classList.add('active');
+        btn.style.borderColor = 'var(--accent-cyan)';
+        btn.style.color = 'var(--accent-cyan)';
+      } else {
+        btn.classList.remove('active');
+        btn.style.borderColor = 'var(--border-color)';
+        btn.style.color = 'var(--text-secondary)';
+      }
+    }
+  };
+
+  // Redimensionamento Dinâmico do Mapa (Rotação de Tela Celular / Tablet)
+  window.addEventListener('resize', () => {
+    if (leafletMap) {
+      leafletMap.invalidateSize();
+    }
+  });
+
   // Callback de GPS Nativo
   window.onNativeGpsUpdate = (lat, lon, speedKmh, alt, bearing, acc) => {
     state.gpsLat = lat;
@@ -381,7 +414,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elHudGpsAlt) elHudGpsAlt.textContent = `${alt.toFixed(0)} m`;
     if (elHudGpsAcc) elHudGpsAcc.textContent = `±${acc.toFixed(0)} m`;
 
-    if (!isMapInitialized && window.L) {
+    const tabMap = document.getElementById('tab-map');
+    const isMapVisible = tabMap && tabMap.classList.contains('active');
+
+    if (!isMapInitialized && window.L && isMapVisible) {
       initLeafletMap();
     }
 

@@ -45,8 +45,16 @@ public class TelemetryService extends Service {
                 .build();
 
         try {
-            startForeground(NOTIFICATION_ID, notification);
-        } catch (Exception ignored) {}
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            try {
+                startForeground(NOTIFICATION_ID, notification);
+            } catch (Exception ignored) {}
+        }
 
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);

@@ -167,6 +167,30 @@ public class MainActivity extends Activity {
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQ_CODE) {
+            for (int i = 0; i < permissions.length; i++) {
+                if (Manifest.permission.ACCESS_FINE_LOCATION.equals(permissions[i])
+                        && grantResults.length > i && grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                    if (isGpsTracking.get()) {
+                        startGpsInternal();
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.resumeTimers();
+        }
+    }
+
     private void setupGpsListener() {
         locationListener = new LocationListener() {
             @Override
@@ -229,6 +253,7 @@ public class MainActivity extends Activity {
                         lastLoc.hasAccuracy() ? lastLoc.getAccuracy() : 999.0f
                 );
             }
+            notifyJsGpsStatus(true);
         } catch (Exception ignored) {}
     }
 
@@ -239,6 +264,14 @@ public class MainActivity extends Activity {
                 locationManager.removeUpdates(locationListener);
             } catch (Exception ignored) {}
         }
+        notifyJsGpsStatus(false);
+    }
+
+    private void notifyJsGpsStatus(final boolean active) {
+        final String js = "if(window.onNativeGpsStatusChanged) window.onNativeGpsStatusChanged(" + active + ");";
+        mainHandler.post(() -> {
+            if (webView != null) webView.evaluateJavascript(js, null);
+        });
     }
 
     private void dispatchGpsToJs(double lat, double lon, float speedKmh, double alt, float bearing, float acc) {
@@ -629,6 +662,7 @@ public class MainActivity extends Activity {
                         Intent shareIntent = new Intent(Intent.ACTION_SEND);
                         shareIntent.setType("text/csv");
                         shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+                        shareIntent.setClipData(android.content.ClipData.newRawUri("CSV", uri));
                         shareIntent.putExtra(Intent.EXTRA_SUBJECT, cleanName);
                         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         startActivity(Intent.createChooser(shareIntent, "Compartilhar Log CSV"));

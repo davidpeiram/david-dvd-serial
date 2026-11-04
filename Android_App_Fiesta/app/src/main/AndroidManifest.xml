@@ -41,7 +41,7 @@
             android:name=".TelemetryService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|location" />
+            android:foregroundServiceType="connectedDevice" />
     </application>
 
 </manifest>

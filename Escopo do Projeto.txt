@@ -436,3 +436,17 @@ Embaixo desse bloco deverá ser escrito pelo Agente que estiver lendo
      - Botão de ativação sob demanda '📍 GPS ON/OFF' para evitar drenagem de bateria do smartphone (que já alimenta o CANable via USB OTG).
      - Integração do mapa Leaflet com tiles CartoDB Dark Matter em 4G, exibindo marcador de posição, rastro em tempo real e HUD com velocidade de satélite vs. ECU.
      - Adição das colunas 'gps_lat' e 'gps_lon' ao datalogger CSV de 27 colunas.
+
+[VERIFICAÇÃO DE SEGURANÇA E COMPATIBILIDADE - RELEASE v2.3.1 (03/11/2026 - 22:45)]
+- Diagnóstico Preventivo Pró-Instalação (Moto G24 Power Android 14 & Lenovo Tab M11):
+  1. Correção Crítica de Foreground Service no Android 14:
+     - 'TelemetryService' ajustado exclusivamente para 'android:foregroundServiceType="connectedDevice"' (removido 'location' do tipo do serviço, já que o serviço gerencia conexão USB e WakeLock, enquanto a localização é gerenciada na Activity).
+     - Evita 'SecurityException' e 'ForegroundServiceDidNotStartInTimeException' no primeiro lançamento no Android 14 caso o usuário ainda não tenha aceito a caixa de diálogo de permissão de GPS.
+  2. Implementação de 'onRequestPermissionsResult':
+     - Permite que o GPS nativo inicie imediatamente assim que o usuário toca em "Permitir" na caixa de diálogo de localização, sem necessidade de tocar novamente no botão.
+  3. Segurança no Compartilhamento de CSV via MediaStore:
+     - Adicionado 'shareIntent.setClipData(ClipData.newRawUri("CSV", uri))' para garantir concessão de leitura a apps terceiros (WhatsApp, Drive, Files) no Android 11 a 14+.
+  4. Redimensionamento e Inicialização Segura do Leaflet:
+     - Adicionado listener para evento 'resize' de janela (garantindo redesenho perfeito do mapa ao alternar entre retrato e paisagem no tablet/celular).
+     - Centralização inteligente: o mapa nasce centralizado na localização real do GPS caso as coordenadas já tenham sido recebidas na aba do Cockpit.
+  5. Atualização de versão: versionCode 24, versionName "2.3.1" (permite atualização direta in-place sem desinstalar).
